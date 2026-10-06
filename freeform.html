@@ -1,0 +1,3576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Basketball Stats — Gathering App</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0f1216">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tagger">
+<style>
+  :root {
+    --bg: #0f1216;
+    --surface: #1b1f27;
+    --surface-2: #262b35;
+    --border: #34394510;
+    --text: #f2f3f5;
+    --text-dim: #9aa1ac;
+    --accent: #3b82f6;
+    --accent-2: #f59e0b;
+    --good: #22c55e;
+    --bad: #ef4444;
+    --team-home: #3b82f6;
+    --team-away: #ef4444;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior-y: contain;
+  }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  h1, h2, h3 { margin: 0 0 8px 0; }
+  .screen { flex: 1; display: flex; flex-direction: column; padding: 16px; padding-bottom: 32px; max-width: 560px; margin: 0 auto; width: 100%; }
+  .hidden { display: none !important; }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius);
+    color: var(--text);
+    background: var(--surface-2);
+    padding: 14px 16px;
+    font-size: 16px;
+    touch-action: manipulation;
+  }
+  button:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: white; font-weight: 600; }
+  .btn-danger { background: var(--bad); color: white; }
+  .btn-ghost { background: transparent; border: 1px solid #ffffff22; color: var(--text-dim); }
+  .btn-block { width: 100%; }
+  .btn-lg { padding: 18px; font-size: 18px; }
+
+  label { display: block; font-size: 14px; color: var(--text-dim); margin: 12px 0 6px; }
+  input[type=text], input[type=date], input[type=number], select {
+    width: 100%; padding: 12px 14px; font-size: 16px;
+    border-radius: var(--radius); border: 1px solid #ffffff22;
+    background: var(--surface); color: var(--text);
+  }
+
+  .card { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+
+  .roster-own-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .roster-own-actions button { flex: 1; }
+  .roster-team-card .team-name-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .roster-team-card .team-name-row input { flex: 1; font-weight: 700; }
+  .roster-player-row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 40px; gap: 6px; margin-bottom: 6px; }
+  .roster-player-row input { min-width: 0; }
+  .roster-player-row input.num { text-align: center; font-variant-numeric: tabular-nums; }
+  .roster-remove-btn { padding: 0; color: var(--bad); background: transparent; }
+  .setup-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .lang-switch { display: flex; gap: 4px; flex-shrink: 0; }
+  .lang-switch button { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+  .lang-switch button.selected { background: var(--accent); color: white; border-color: var(--accent); }
+  .team-pick-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .team-pick-row button { flex: 1 1 120px; min-width: 0; }
+  .team-pick-row button.selected { background: var(--accent); color: white; }
+  .foul-type-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
+  .foul-type-row button { min-height: 40px; padding: 6px 4px; font-size: 13px; overflow-wrap: anywhere; }
+  .foul-type-row button.selected { background: var(--accent-2); color: #111; font-weight: 700; }
+  .team-pick-row button:disabled { background: var(--bg); color: var(--text-dim); opacity: 0.6; cursor: not-allowed; }
+
+  /* Tagging screen */
+  .topbar {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--bg); padding-bottom: 10px;
+    /* 2x2 on phones — period + Undo (the mid-play controls) on top, Stats + Finish below —
+       one row once there's room for all four. */
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; gap: 8px;
+  }
+  .topbar > button { padding: 12px 10px; font-size: 15px; white-space: nowrap; }
+  .period-control { justify-content: space-between; }
+  @media (min-width: 520px) {
+    .topbar { grid-template-columns: auto 1fr 1fr 1.4fr; }
+  }
+  .period-control { display: flex; align-items: center; gap: 6px; background: var(--surface); border-radius: var(--radius); padding: 6px 10px; }
+  .period-control span { min-width: 40px; text-align: center; font-weight: 600; }
+  .period-control button { padding: 8px 12px; font-size: 18px; }
+  .period-control button:disabled { opacity: .35; }
+
+  .scoreboard {
+    display: flex; align-items: baseline; justify-content: center; gap: 8px;
+    background: var(--surface); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px;
+  }
+  .scoreboard-name {
+    font-size: 13px; font-weight: 600; color: var(--text-dim);
+    max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .scoreboard-value { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .scoreboard-value.team-home { color: var(--team-home); }
+  .scoreboard-value.team-away { color: var(--team-away); }
+  .scoreboard-sep { color: var(--text-dim); font-size: 20px; }
+
+  .team-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .team-tabs button { flex: 1; background: var(--surface); }
+  .team-tabs button.team-home.active { background: var(--team-home); color: white; }
+  .team-tabs button.team-away.active { background: var(--team-away); color: white; }
+
+  .player-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .player-btn { background: var(--surface); text-align: left; padding: 16px 12px; min-height: 64px; border-left: 4px solid transparent; min-width: 0; }
+  .player-grid.team-context-home .player-btn { border-left-color: var(--team-home); }
+  .player-grid.team-context-away .player-btn { border-left-color: var(--team-away); }
+  .player-btn .jersey { color: var(--text-dim); font-size: 13px; }
+  .player-btn .name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+  .player-btn.by-number .name { font-size: 26px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .player-btn.selected { background: var(--accent); color: white; }
+  .player-btn.selected .jersey { color: #ffffffcc; }
+  .player-grid.team-context-home .player-btn.selected { background: var(--team-home); }
+  .player-grid.team-context-away .player-btn.selected { background: var(--team-away); }
+
+  .score-only-note { color: var(--text-dim); text-align: center; padding: 20px 0; }
+  .score-only-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+  .score-only-row button { flex: 1 1 100px; min-height: 64px; font-size: 20px; font-weight: 700; }
+
+  .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim); margin: 8px 0; }
+
+  .log-entry {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border-radius: var(--radius);
+    padding: 12px 14px; margin-bottom: 8px;
+    border-left: 4px solid transparent;
+  }
+  .log-entry.team-home { border-left-color: var(--team-home); }
+  .log-entry.team-away { border-left-color: var(--team-away); }
+  .log-entry .meta { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+  .log-entry .desc { font-weight: 600; }
+  .log-entry .del-btn { background: transparent; color: var(--bad); padding: 6px 10px; font-size: 20px; line-height: 1; }
+  .log-entry .period-btn {
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border, currentColor);
+    border-radius: 6px; padding: 0 6px; font-size: 13px; line-height: 1.6; min-height: unset;
+  }
+  .empty-log { color: var(--text-dim); text-align: center; padding: 20px 0; }
+  .log-btn { margin-top: 16px; }
+  .log-divider {
+    font-size: 13px; font-weight: 700; letter-spacing: .04em; color: var(--text-dim);
+    margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #ffffff1f;
+  }
+  .log-divider:first-child { margin-top: 0; }
+  .log-pause { font-size: 12px; color: var(--accent-2); text-align: center; margin: -2px 0 8px; }
+  .pause-nudge {
+    background: var(--surface); border-radius: var(--radius); border-left: 4px solid var(--accent-2);
+    padding: 10px 14px; margin-bottom: 12px; font-size: 14px;
+  }
+  .pause-nudge-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .pause-nudge-actions button { flex: 1; padding: 8px 10px; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; background: #000000aa;
+    display: flex; align-items: flex-end; justify-content: center; z-index: 20;
+  }
+  .modal-sheet {
+    background: var(--surface); width: 100%; max-width: 560px;
+    border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+    /* A sheet taller than the screen (e.g. Substitutions with a long bench) would otherwise
+       push its top off-screen, unreachable — cap it and let it scroll inside itself. dvh
+       tracks mobile browser toolbars; vh is the fallback for browsers without it. */
+    max-height: 92vh; max-height: 92dvh;
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  }
+  /* Pinned to the bottom of a scrolling sheet, so its action is always one tap away. */
+  .sheet-footer {
+    position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom));
+    background: var(--surface); margin: 14px -16px calc(-20px - env(safe-area-inset-bottom));
+    padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid #ffffff14;
+  }
+  .modal-title { font-size: 15px; color: var(--text-dim); margin-bottom: 14px; }
+  .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-grid button { min-height: 56px; font-size: 17px; font-weight: 600; }
+  .modal-list { display: flex; flex-direction: column; gap: 8px; }
+  .modal-list button { text-align: left; min-height: 52px; }
+  .modal-list.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .modal-list.two-col button { min-height: 48px; padding: 10px 12px; font-size: 15px; overflow-wrap: anywhere; }
+  .modal-list.two-col .empty-log { grid-column: 1 / -1; }
+  .modal-list button:disabled { opacity: .4; cursor: not-allowed; }
+  .modal-list button.selected { background: var(--accent); color: white; }
+  .modal-list.team-context-home button.selected { background: var(--team-home); }
+  .modal-list.team-context-away button.selected { background: var(--team-away); }
+  .modal-grid .sub-btn { grid-column: 1 / -1; min-height: 48px; background: var(--surface-2); }
+
+  .zone-fallback-row { display: flex; gap: 10px; margin-top: 12px; }
+  .zone-fallback-row button { flex: 1; }
+
+  /* Half-court diagram drawn by both shot pickers (shared.js renderCourtLines). */
+  .court-map { width: 100%; height: auto; display: block; margin: 4px 0 2px; touch-action: manipulation; background: var(--surface-2); border-radius: 8px; }
+  .court-line { stroke: var(--text-dim); stroke-width: 0.3; fill: none; pointer-events: none; stroke-linecap: round; stroke-linejoin: round; }
+  .court-line-three { stroke: var(--accent-2); stroke-width: 0.5; fill: none; pointer-events: none; stroke-linecap: round; }
+
+  .zone-fallback-row.hidden { display: none; }
+
+  .court-bg { fill: transparent; cursor: pointer; }
+  .court-marker { fill: var(--accent); stroke: #fff; stroke-width: 0.3; pointer-events: none; }
+  .court-readout { text-align: center; color: var(--text-dim); font-size: 14px; margin: 8px 0 0; min-height: 20px; }
+
+  .made-btn { background: var(--good); color: #06210f; }
+  .missed-btn { background: #3a1f1f; color: var(--text); }
+  .reb-btn { background: var(--surface-2); }
+  .turnover-btn { background: var(--surface-2); }
+
+  .finish-bar { margin-top: 12px; }
+
+  .squad-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .squad-toolbar .section-title { flex: 1; }
+  .squad-toolbar button { padding: 8px 14px; font-size: 14px; }
+  .player-grid.compact { gap: 8px; }
+  .player-grid.compact .player-btn { min-height: 48px; padding: 10px 12px; }
+  .player-grid.compact .player-btn .name { font-size: 15px; }
+
+  .storage-warning {
+    background: var(--bad); color: white; font-size: 14px; font-weight: 600;
+    padding: 10px 16px; text-align: center;
+  }
+  .roster-status { margin: 0 0 10px; font-size: 14px; }
+  .file-btn {
+    display: block; text-align: center; padding: 14px 16px; margin: 0;
+    border-radius: var(--radius); font-size: 16px; color: var(--text); cursor: pointer;
+  }
+  .file-btn input { display: none; }
+  #undo-btn:disabled { opacity: .35; }
+
+  footer.hint { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 24px; }
+  .variant-switch { margin-top: 10px; font-size: 14px; }
+  .variant-switch a { color: var(--accent); }
+  .build-id { margin-top: 8px; opacity: .6; font-variant-numeric: tabular-nums; }
+  .link-btn { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+
+  /* Stats overlay */
+  #stats-overlay {
+    position: fixed; inset: 0; z-index: 30;
+    background: var(--bg); color: var(--text);
+    overflow-y: auto; padding: 16px; padding-bottom: 32px;
+  }
+  .stats-overlay-inner { max-width: 720px; margin: 0 auto; }
+  .stats-header { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stats-header button { flex: 1; }
+  .stats-score-line { text-align: center; font-size: 22px; font-weight: 800; margin-bottom: 20px; }
+  .stats-scroll { overflow-x: auto; margin-bottom: 24px; }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .stats-table td { white-space: nowrap; }
+  .stats-table td.pct { color: var(--text-dim); }
+  .stats-table caption { text-align: left; font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+  .stats-table th, .stats-table td { border: 1px solid var(--border, #ffffff22); padding: 5px 7px; text-align: right; }
+  .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
+  .stats-table thead th { background: var(--surface-2); white-space: nowrap; }
+  .stats-table tr.totals-row { font-weight: 700; background: var(--surface); }
+
+  @page { size: A4 landscape; margin: 12mm; }
+  @media print {
+    /* display, not visibility: a visibility-hidden screen still takes up its full height, so a
+       long event log printed as a run of blank pages ahead of the box score. */
+    body > *:not(#stats-overlay) { display: none !important; }
+    body { background: white; }
+    #stats-overlay { position: static; overflow: visible; background: white; color: black; padding: 0; }
+    .no-print { display: none !important; }
+    .stats-scroll { overflow: visible; }
+    .stats-table { font-size: 10px; }
+    .stats-table th, .stats-table td { border-color: #999; color: black; padding: 3px 4px; }
+    .stats-table thead th, .stats-table tr.totals-row { background: #eee; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MAINTAINER: this file is built, not hand-edited. It's assembled in two steps:
+       1. python3 build.py           — assembles gathering-app/src/* into this file (and its
+                                        sibling index-freeform.html) from shared source, so the
+                                        two variants (tap-a-zone vs tap-an-exact-spot) don't
+                                        drift out of sync with each other by hand.
+       2. python3 generate.py roster.json  — embeds a roster.json (downloaded from the
+                                        Analytics Project's Roster page) into a COPY of this
+                                        file to produce game-tagger.html, which is what actually
+                                        gets shared with a contributor. Do not change this tag's
+                                        id or type — generate.py finds it by exact string match. -->
+<script type="application/json" id="roster-data">
+{"hosted": true}
+</script>
+
+<!-- Shown when this browser won't let the page save anything (see storageOk in shared.js). -->
+<div id="storage-warning" class="storage-warning hidden" data-i18n="storage.warning"></div>
+
+<!-- ============ Screen 1: Match setup ============ -->
+<div id="setup-screen" class="screen">
+  <div class="setup-header">
+    <h1 data-i18n="setup.title"></h1>
+    <!-- Filled from LANGUAGES in i18n.js (see renderLanguageSwitch). -->
+    <div class="lang-switch" id="lang-switch"></div>
+  </div>
+
+  <!-- Hosted build only (see IS_HOSTED in shared.js): the roster isn't embedded, the
+       contributor loads the roster.json they were sent. -->
+  <div id="roster-card" class="card hidden">
+    <label style="margin-top:0;" data-i18n="setup.roster"></label>
+    <p id="roster-status" class="roster-status"></p>
+    <label class="btn-ghost btn-block file-btn">
+      <span data-i18n="setup.loadRoster"></span>
+      <input type="file" id="roster-file-input" accept=".json,application/json">
+    </label>
+    <p id="roster-error" class="hidden" style="color:var(--bad); margin:8px 0 0;"></p>
+    <!-- A roster typed in here instead of loaded (see the roster editor below). -->
+    <button id="roster-create-btn" class="btn-ghost btn-block" style="margin-top:8px;" data-i18n="rosterEdit.create"></button>
+    <div id="roster-own-actions" class="roster-own-actions hidden">
+      <button id="roster-edit-btn" class="btn-ghost" data-i18n="rosterEdit.edit"></button>
+      <button id="roster-download-btn" class="btn-ghost" data-i18n="rosterEdit.download"></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label data-i18n="setup.playedOn"></label>
+    <input type="date" id="played-on-input">
+
+    <label data-i18n="setup.taggerName"></label>
+    <input type="text" id="tagger-name-input" data-i18n-placeholder="setup.taggerNamePlaceholder">
+
+    <label data-i18n="setup.home"></label>
+    <div id="home-team-picker"></div>
+
+    <div id="away-team-section">
+      <label data-i18n="setup.away"></label>
+      <div id="away-team-picker"></div>
+    </div>
+
+    <label data-i18n="setup.competition"></label>
+    <select id="competition-select"></select>
+
+    <!-- Names or jersey numbers on the tagging screen (see labelMode in shared.js). -->
+    <label data-i18n="setup.labels"></label>
+    <div id="label-mode-picker"></div>
+  </div>
+
+  <button id="start-match-btn" class="btn-primary btn-block btn-lg" data-i18n="setup.start"></button>
+  <p id="setup-error" class="hidden" style="color:var(--bad); text-align:center; margin-top:10px;"></p>
+
+  <footer class="hint">
+    <span data-i18n="setup.offline"></span>
+    <!-- Hosted build only: link to the other shot-picker variant's page (see renderVariantSwitch). -->
+    <div id="variant-switch" class="variant-switch hidden"></div>
+    <!-- Filled in by build.py (compute_build_id) — tells you which build a phone is running. -->
+    <div class="build-id">build b916271</div>
+  </footer>
+</div>
+
+<!-- ============ Screen 1.1: Roster editor (hosted build only) ============ -->
+<!-- For a game the analytics side has no roster for: teams and players typed in on the phone.
+     Jersey number required, name optional. The resulting roster is flagged tagger_made, so every
+     export carries it (tagger_roster) and the analytics import can match or create its teams and
+     players. See renderRosterEditor in shared.js. -->
+<div id="roster-screen" class="screen hidden">
+  <h1 data-i18n="rosterEdit.title"></h1>
+  <p style="color:var(--text-dim); font-size:14px; margin:-8px 0 12px;" data-i18n="rosterEdit.hint"></p>
+  <div id="roster-editor"></div>
+  <button id="roster-add-team-btn" class="btn-ghost btn-block" style="margin-bottom:16px;" data-i18n="rosterEdit.addTeam"></button>
+  <button id="roster-save-btn" class="btn-primary btn-block btn-lg" data-i18n="rosterEdit.save"></button>
+  <button id="roster-back-btn" class="btn-ghost btn-block" style="margin-top:10px;" data-i18n="common.back"></button>
+  <p id="roster-editor-error" class="hidden" style="color:var(--bad); text-align:center; margin-top:10px;"></p>
+</div>
+
+<!-- ============ Screen 1.25: Who's playing today (matchday squad) ============ -->
+<!-- Only tracked teams — a score-only side has no people to pick. Only the players ticked here
+     are offered for the starting lineup and on the Substitutions bench; the squad is exported
+     so the analytics side can show DNPs (see squadIds in shared.js). -->
+<div id="squad-screen" class="screen hidden">
+  <h1 data-i18n="squad.title"></h1>
+  <p style="color:var(--text-dim); font-size:14px; margin:-8px 0 4px;" data-i18n="squad.hint"></p>
+
+  <div class="team-tabs" id="squad-team-tabs"></div>
+  <div class="squad-toolbar">
+    <div class="section-title" id="squad-count-label"></div>
+    <button id="squad-all-btn" class="btn-ghost" data-i18n="squad.all"></button>
+    <button id="squad-none-btn" class="btn-ghost" data-i18n="squad.none"></button>
+  </div>
+  <div class="player-grid compact" id="squad-grid"></div>
+
+  <button id="squad-continue-btn" class="btn-primary btn-block btn-lg finish-bar" data-i18n="squad.next"></button>
+  <button id="squad-back-btn" class="btn-ghost btn-block" style="margin-top:10px;" data-i18n="common.back"></button>
+  <p id="squad-error" class="hidden" style="color:var(--bad); text-align:center; margin-top:10px;"></p>
+</div>
+
+<!-- ============ Screen 1.5: Starting lineups ============ -->
+<div id="starters-screen" class="screen hidden">
+  <h1 data-i18n="starters.title"></h1>
+  <p style="color:var(--text-dim); font-size:14px; margin:-8px 0 4px;" data-i18n="starters.hint"></p>
+
+  <div class="team-tabs" id="starters-team-tabs"></div>
+  <div class="section-title" id="starters-count-label"></div>
+  <div class="player-grid" id="starters-grid"></div>
+  <p id="starters-score-only-note" class="hidden score-only-note" data-i18n="starters.scoreOnly"></p>
+
+  <button id="starters-continue-btn" class="btn-primary btn-block btn-lg finish-bar" data-i18n="starters.start"></button>
+  <button id="starters-back-btn" class="btn-ghost btn-block" style="margin-top:10px;" data-i18n="common.back"></button>
+  <p id="starters-error" class="hidden" style="color:var(--bad); text-align:center; margin-top:10px;"></p>
+</div>
+
+<!-- ============ Screen 2: Tagging ============ -->
+<div id="tagging-screen" class="screen hidden">
+  <div class="topbar">
+    <div class="period-control">
+      <button id="period-minus-btn">−</button>
+      <span id="period-label">Q1</span>
+      <button id="period-plus-btn">+</button>
+    </div>
+    <button id="undo-btn" class="btn-ghost" data-i18n-title="tag.undoTitle" data-i18n="tag.undo"></button>
+    <button id="stats-btn" class="btn-ghost" data-i18n="tag.stats"></button>
+    <button id="finish-btn" class="btn-primary" data-i18n="tag.finish"></button>
+  </div>
+
+  <div class="scoreboard" id="scoreboard">
+    <span class="scoreboard-name" id="score-home-name"></span>
+    <span class="scoreboard-value team-home" id="score-home-value">0</span>
+    <span class="scoreboard-sep">–</span>
+    <span class="scoreboard-value team-away" id="score-away-value">0</span>
+    <span class="scoreboard-name" id="score-away-name"></span>
+  </div>
+
+  <!-- Asked after a long gap between taps — see maybeNudgeLongPause in shared.js. Not a modal:
+       tagging carries on underneath until it's answered. -->
+  <div class="pause-nudge hidden" id="pause-nudge">
+    <span id="pause-nudge-text"></span>
+    <div class="pause-nudge-actions">
+      <button id="pause-nudge-yes-btn" class="btn-primary"></button>
+      <button id="pause-nudge-no-btn" class="btn-ghost" data-i18n="tag.pauseNo"></button>
+    </div>
+  </div>
+
+  <div class="team-tabs" id="team-tabs"></div>
+  <button id="subs-btn" class="btn-block" style="margin-bottom:12px;" data-i18n="tag.subs"></button>
+  <div class="player-grid" id="player-grid"></div>
+  <!-- Shown instead of #player-grid when the active team is score-only (no consenting
+       roster for that side) — see isScoreOnly in shared.js. -->
+  <div class="score-only-row hidden" id="score-only-panel">
+    <button id="score-only-2-btn" class="made-btn">+2</button>
+    <button id="score-only-3-btn" class="made-btn">+3</button>
+    <button id="score-only-ft-btn" class="made-btn" data-i18n="tag.ftButton"></button>
+  </div>
+
+  <button id="log-btn" class="btn-ghost btn-block log-btn"></button>
+</div>
+
+<!-- ============ Stats overlay: client-computed box score, print-to-PDF ============ -->
+<div id="stats-overlay" class="hidden">
+  <div class="stats-overlay-inner">
+    <div class="stats-header no-print">
+      <button id="stats-close-btn" class="btn-ghost" data-i18n="stats.close"></button>
+      <button id="stats-print-btn" class="btn-primary" data-i18n="stats.print"></button>
+    </div>
+    <div id="stats-content"></div>
+  </div>
+</div>
+
+<!-- ============ Modal: event type picker ============ -->
+<div id="event-type-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" id="event-type-modal-title"></div>
+    <div class="modal-grid">
+      <button class="made-btn" data-action="score" data-i18n="event.score"></button>
+      <button class="missed-btn" data-action="miss" data-i18n="event.miss"></button>
+      <button class="made-btn" data-action="ft_made" data-i18n="event.ftMade"></button>
+      <button class="missed-btn" data-action="ft_missed" data-i18n="event.ftMissed"></button>
+      <button class="reb-btn" data-action="off_reb" data-i18n="event.offReb"></button>
+      <button class="reb-btn" data-action="def_reb" data-i18n="event.defReb"></button>
+      <button class="turnover-btn" data-action="turnover" data-i18n="event.turnover"></button>
+      <button class="turnover-btn" data-action="steal" data-i18n="event.steal"></button>
+      <button class="turnover-btn" data-action="foul" data-i18n="event.foul"></button>
+      <button class="turnover-btn" data-action="block" data-i18n="event.block"></button>
+      <button class="sub-btn" data-action="sub" data-i18n="event.sub"></button>
+    </div>
+    <button id="event-type-cancel-btn" class="btn-ghost btn-block" style="margin-top:12px;" data-i18n="common.cancel"></button>
+  </div>
+</div>
+
+<!-- ============ Modal: shot location picker ============ -->
+<div id="zone-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" id="zone-modal-title"></div>
+    <svg id="court-map" class="court-map" viewBox="0 0 50 32" xmlns="http://www.w3.org/2000/svg"></svg>
+    <p id="court-readout" class="court-readout" data-i18n="shot.tapCourt"></p>
+    <div id="court-confirm-row" class="zone-fallback-row hidden">
+      <button id="court-confirm-btn" class="btn-primary" data-i18n="shot.confirm"></button>
+      <button id="court-retry-btn" class="btn-ghost" data-i18n="shot.retry"></button>
+    </div>
+    <div class="zone-fallback-row">
+      <button id="zone-fallback-2-btn" class="btn-ghost" data-i18n="shot.no2"></button>
+      <button id="zone-fallback-3-btn" class="btn-ghost" data-i18n="shot.no3"></button>
+    </div>
+    <button id="zone-cancel-btn" class="btn-ghost btn-block" style="margin-top:10px;" data-i18n="common.cancel"></button>
+  </div>
+</div>
+
+<!-- ============ Modal: assist picker ============ -->
+<div id="assist-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" data-i18n="assist.title"></div>
+    <div class="modal-list" id="assist-list"></div>
+    <button id="no-assist-btn" class="btn-primary btn-block" style="margin-top:12px;" data-i18n="assist.none"></button>
+    <button id="assist-cancel-btn" class="btn-ghost btn-block" style="margin-top:8px;" data-i18n="assist.cancel"></button>
+  </div>
+</div>
+
+<!-- ============ Modal: linked attribution picker ============ -->
+<!-- Shared by three flows, each one live-ball episode with two protagonists on different
+     teams: Steal -> who lost the ball (logs a linked turnover, since undercounting team
+     turnovers by relying on a separate manual tap is a real risk); Foul -> who drew it;
+     Block -> whose shot. "Skip" logs just the primary event; "Cancel" logs nothing. -->
+<div id="link-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <!-- Foul only: the foul's type, preselected to Personal so the common case is still one tap
+         on who drew it. Filled from FOUL_TYPES in shared.js. -->
+    <div class="foul-type-row hidden" id="foul-type-row"></div>
+    <div class="modal-title" id="link-modal-title"></div>
+    <div class="modal-list" id="link-list"></div>
+    <button id="link-skip-btn" class="btn-primary btn-block" style="margin-top:12px;"></button>
+    <button id="link-cancel-btn" class="btn-ghost btn-block" style="margin-top:8px;" data-i18n="common.cancel"></button>
+  </div>
+</div>
+
+<!-- ============ Modal: substitutions ============ -->
+<div id="subs-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" data-i18n="subs.title"></div>
+    <!-- Both tracked teams in one visit: subs usually happen for both sides at the same dead ball. -->
+    <div class="team-tabs" id="subs-team-tabs"></div>
+    <div class="section-title" id="subs-oncourt-title"></div>
+    <div class="modal-list two-col" id="subs-oncourt-list"></div>
+    <div class="section-title" style="margin-top:14px;" id="subs-bench-title"></div>
+    <div class="modal-list two-col" id="subs-bench-list"></div>
+    <!-- Someone fouled out with nobody left on the bench, or an injury the team plays short after. -->
+    <button id="subs-out-only-btn" class="btn-ghost btn-block hidden" style="margin-top:12px;"></button>
+    <!-- A late arrival, or someone left out of "Who's playing today?" by mistake. -->
+    <button id="subs-extra-toggle" class="btn-ghost btn-block hidden" style="margin-top:12px;"></button>
+    <div class="modal-list two-col hidden" id="subs-extra-list" style="margin-top:8px;"></div>
+    <div class="sheet-footer">
+      <button id="subs-done-btn" class="btn-primary btn-block" data-i18n="common.done"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modal: event log ============ -->
+<!-- Before #confirm-modal so a delete confirm opened from here stacks on top of it. -->
+<div id="log-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" data-i18n="tag.eventLog"></div>
+    <div id="event-log"></div>
+    <div class="sheet-footer">
+      <button id="log-close-btn" class="btn-primary btn-block" data-i18n="stats.close"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modal: generic confirm ============ -->
+<div id="confirm-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" id="confirm-modal-text"></div>
+    <div style="display:flex; gap:10px;">
+      <button id="confirm-yes-btn" class="btn-primary" style="flex:1;" data-i18n="common.yes"></button>
+      <button id="confirm-no-btn" class="btn-ghost" style="flex:1;" data-i18n="common.cancel"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Modal: saved match from a different tagger file ============ -->
+<div id="recovery-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" data-i18n="recovery.title"></div>
+    <p style="color:var(--text-dim); font-size:14px; margin:-6px 0 16px;" data-i18n="recovery.text"></p>
+    <!-- Hosted build, match started on the other variant's page: just go back there. -->
+    <a id="recovery-switch-link" class="btn-primary btn-block link-btn hidden" style="margin-bottom:8px;"></a>
+    <button id="recovery-export-btn" class="btn-primary btn-block" style="margin-bottom:8px;" data-i18n="recovery.export"></button>
+    <button id="recovery-discard-btn" class="btn-ghost btn-block" data-i18n="recovery.discard"></button>
+  </div>
+</div>
+
+<!-- ============ Modal: export ============ -->
+<div id="export-modal" class="modal-overlay hidden">
+  <div class="modal-sheet">
+    <div class="modal-title" data-i18n="export.title"></div>
+    <p id="export-modal-desc" style="color:var(--text-dim); font-size:14px; margin:-6px 0 16px;"></p>
+    <a id="export-download-link" class="btn-primary btn-block" style="display:block; box-sizing:border-box; text-align:center; text-decoration:none; margin-bottom:10px;" download data-i18n="export.download"></a>
+    <button id="export-share-btn" class="btn-block hidden" style="margin-bottom:10px;" data-i18n="export.share"></button>
+    <p id="export-share-status" class="hidden" style="color:var(--text-dim); font-size:13px; margin:-4px 0 10px;"></p>
+    <button id="export-done-btn" class="btn-primary btn-block" style="margin-bottom:8px;" data-i18n="export.done"></button>
+    <button id="export-keep-btn" class="btn-ghost btn-block" data-i18n="export.keep"></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Language ----------
+  // Every user-facing string, in Italian (the default — contributors are Italian club
+  // volunteers) and English. Static text in shared.html carries a data-i18n key filled in by
+  // applyStaticTranslations(); text built in JS goes through t(). The choice is per device,
+  // switched from the setup screen. Nothing here reaches the export: ids like "personal" or
+  // "left_corner_3" stay English in the JSON, only their labels are translated.
+  var LANG_STORAGE_KEY = "bball_lang_v1";
+  var LANGUAGES = [
+    { id: "it", label: "Italiano" },
+    { id: "en", label: "English" }
+  ];
+
+  var STRINGS = {
+    it: {
+      "storage.warning": "⚠️ Questo browser non sta salvando i dati. Non chiudere né ricaricare la pagina, ed esporta prima di uscire.",
+
+      "setup.title": "Nuova partita",
+      "setup.roster": "Roster",
+      "setup.loadRoster": "Carica il file del roster…",
+      "setup.playedOn": "Data della partita",
+      "setup.taggerName": "Il tuo nome",
+      "setup.taggerNamePlaceholder": "es. Marco",
+      "setup.home": "Squadra di casa",
+      "setup.away": "Squadra ospite",
+      "setup.competition": "Competizione",
+      "setup.noCompetition": "Nessuna competizione (amichevole)",
+      "setup.start": "Inizia partita",
+      "setup.offline": "Funziona anche offline. I dati restano salvati su questo dispositivo mentre registri.",
+      "setup.language": "Lingua",
+      "setup.labels": "Giocatori mostrati per",
+      "labels.name": "Nome",
+      "labels.number": "Numero di maglia",
+      "setup.noRoster": "Nessun roster caricato. Carica il file roster.json che ti è stato inviato, oppure creane uno qui.",
+      "rosterEdit.create": "Crea un roster qui",
+      "rosterEdit.edit": "Modifica roster",
+      "rosterEdit.download": "Scarica roster",
+      "rosterEdit.title": "Roster",
+      "rosterEdit.hint": "Numero di maglia obbligatorio, nome facoltativo. Le righe vuote vengono ignorate.",
+      "rosterEdit.teamName": "Nome squadra {n}",
+      "rosterEdit.playerName": "Nome (facoltativo)",
+      "rosterEdit.addPlayer": "+ Giocatore",
+      "rosterEdit.addTeam": "+ Squadra",
+      "rosterEdit.removePlayer": "Togli giocatore",
+      "rosterEdit.removeTeam": "Togli squadra",
+      "rosterEdit.save": "Salva roster",
+      "rosterEdit.errTeamName": "Dai un nome alla squadra {n}.",
+      "rosterEdit.errTeamDup": "Due squadre si chiamano \"{team}\".",
+      "rosterEdit.errNoNumber": "Manca il numero di maglia di {name} ({team}).",
+      "rosterEdit.errNumber": "\"{n}\" non è un numero di maglia valido (0–99) — {team}.",
+      "rosterEdit.errNumberDup": "Il numero {n} è usato due volte in {team}.",
+      "rosterEdit.errNoPlayers": "{team} non ha giocatori.",
+      "setup.rosterLoaded": "Caricato: {teams} ({n} giocatori)",
+      "setup.notJson": "Questo file non è un JSON valido.",
+      "setup.cantRead": "Impossibile leggere il file.",
+      "setup.errNoRoster": "Carica prima il file del roster.",
+      "setup.errTeams": "Scegli la squadra di casa e quella ospite.",
+      "setup.errName": "Inserisci il tuo nome.",
+      "setup.shotLocations": "Posizione dei tiri: {current} · ",
+      "setup.switchTo": "passa a {other}",
+      "variant.zone": "zone",
+      "variant.freeform": "punto esatto",
+
+      "roster.notRoster": "Questo non è un file roster.json (mancano 'teams' e 'players').",
+      "roster.twoTeams": "Il roster deve avere almeno due squadre (casa e ospite).",
+      "roster.teamMissing": "Alla squadra n. {n} manca l'id o il nome.",
+      "roster.playerMissing": "Al giocatore n. {n} manca l'id, il nome o la squadra.",
+      "roster.unknownTeam": "Il giocatore '{name}' appartiene a una squadra sconosciuta.",
+      "roster.noFullTeam": "Nel roster non c'è nessuna squadra con giocatori da seguire.",
+      "roster.competitionsList": "'competitions' deve essere una lista.",
+
+      "squad.title": "Chi gioca oggi?",
+      "squad.hint": "Seleziona tutti i convocati di oggi. Solo loro compariranno nel quintetto e nei cambi.",
+      "squad.all": "Tutti",
+      "squad.none": "Nessuno",
+      "squad.next": "Avanti: quintetti iniziali",
+      "squad.count": "{n} di {total} convocati",
+      "squad.errEmpty": "Seleziona almeno un giocatore per {team}.",
+      "common.back": "Indietro",
+      "common.cancel": "Annulla",
+      "common.yes": "Sì",
+      "common.done": "Fatto",
+
+      "starters.title": "Quintetti iniziali",
+      "starters.hint": "Scegli chi parte in campo. Potrai fare i cambi dopo.",
+      "starters.scoreOnly": "Per questa squadra si segna solo il punteggio: non serve il quintetto.",
+      "starters.start": "Inizia a registrare",
+      "starters.count": "{n} di 5 selezionati",
+      "starters.errEmpty": "Scegli almeno un giocatore in campo per ogni squadra.",
+
+      "tag.undo": "↶ Annulla ultimo",
+      "tag.undoTitle": "Annulla l'ultimo evento",
+      "tag.stats": "📊 Statistiche",
+      "tag.finish": "Fine ed esporta",
+      "tag.subs": "🔄 Cambi",
+      "tag.ftButton": "+1 (TL)",
+      "tag.eventLog": "Eventi",
+      "tag.eventLogBtn": "📋 Eventi ({count})",
+      "tag.pauseNudge": "Pausa lunga ({time}): è iniziato il {period}?",
+      "tag.pauseYes": "Sì, {period}",
+      "tag.pauseNo": "No",
+      "tag.pauseMarker": "⏸ pausa {time}",
+      "tag.noEvents": "Nessun evento registrato.",
+      "tag.movePrev": "Sposta l'evento al periodo precedente",
+      "tag.moveNext": "Sposta l'evento al periodo successivo",
+      "tag.delete": "Elimina l'evento",
+      "tag.confirmDelete": "Eliminare questo evento? {desc}",
+      "tag.confirmUndo": "Annullare {desc}?",
+
+      "event.title": "Evento per {name}",
+      "event.score": "Segnato",
+      "event.miss": "Sbagliato",
+      "event.ftMade": "TL segnato",
+      "event.ftMissed": "TL sbagliato",
+      "event.offReb": "Rimb. off.",
+      "event.defReb": "Rimb. dif.",
+      "event.turnover": "Palla persa",
+      "event.steal": "Recupero",
+      "event.foul": "Fallo",
+      "event.block": "Stoppata",
+      "event.sub": "⇄ Cambio",
+
+      "desc.made": "Tiro da {points} segnato",
+      "desc.missed": "Tiro da {points} sbagliato",
+      "desc.assist": " (assist: {name})",
+      "desc.ftMade": "TL segnato",
+      "desc.ftMissed": "TL sbagliato",
+      "desc.offReb": "Rimb. offensivo",
+      "desc.defReb": "Rimb. difensivo",
+      "desc.turnover": "Palla persa",
+      "desc.steal": "Palla recuperata",
+      "desc.foul": "Fallo",
+      "desc.drawnBy": " (subìto da: {name})",
+      "desc.block": "Stoppata",
+      "desc.shotBy": " (tiro di: {name})",
+
+      "foul.personal": "Personale",
+      "foul.shooting": "Su tiro",
+      "foul.offensive": "Offensivo",
+      "foul.technical": "Tecnico",
+      "foul.unsportsmanlike": "Antisportivo",
+      "foul.disqualifying": "Espulsione",
+      "foulLog.personal": "Fallo personale",
+      "foulLog.shooting": "Fallo su tiro",
+      "foulLog.offensive": "Fallo offensivo",
+      "foulLog.technical": "Fallo tecnico",
+      "foulLog.unsportsmanlike": "Fallo antisportivo",
+      "foulLog.disqualifying": "Fallo da espulsione",
+      "foul.titleNoLink": "{type} — {name}",
+      "foul.log": "Registra {type}",
+
+      "shot.where": "Dove è stato il tiro? — {kind}",
+      "shot.no2": "Da 2 (senza zona)",
+      "shot.no3": "Da 3 (senza zona)",
+      "shot.flip": "⇄ Canestro dall'altra parte",
+      "shot.tapCourt": "Tocca il campo dove è partito il tiro.",
+      "shot.marked": "Tiro da {points} indicato — conferma o riprova.",
+      "shot.confirm": "Conferma",
+      "shot.retry": "Riprova",
+
+      "assist.title": "Assist di?",
+      "assist.none": "Nessun assist",
+      "assist.cancel": "Annulla questo tiro",
+
+      "link.stealTitle": "Palla persa da? — {team}",
+      "link.stealSkip": "Salta (solo recupero)",
+      "link.foulTitle": "Fallo subìto da? — {team}",
+      "link.blockTitle": "Tiro di? — {team}",
+      "link.skip": "Salta (nessun giocatore)",
+
+      "subs.title": "Cambi",
+      "subs.onCourtPick": "In campo — tocca chi esce",
+      "subs.onCourtDeselect": "In campo — tocca di nuovo per deselezionare",
+      "subs.benchReplace": "Panchina — tocca chi entra al posto di {name}",
+      "subs.benchPickFirst": "Panchina — scegli prima chi esce",
+      "subs.benchSendOn": "Panchina — tocca per far entrare",
+      "subs.noneOnCourt": "Nessuno in campo.",
+      "subs.squadAllOn": "Tutti i convocati sono in campo.",
+      "subs.rosterAllOn": "Tutto il roster è in campo.",
+      "subs.outOnly": "Fai uscire {name} senza sostituto",
+      "subs.addExtra": "+ Aggiungi un giocatore non convocato",
+      "subs.hideExtra": "Nascondi i non convocati",
+
+      "finish.confirm": "Terminare la partita ed esportarla ora?",
+      "recovery.title": "Partita non finita da un altro file del tagger",
+      "recovery.text": "Su questo dispositivo c'è una partita non finita registrata con un altro file del tagger o un altro roster, quindi non si può continuare qui. Esportala per tenerla (apri il file originale per continuare), oppure eliminala per iniziare una nuova partita.",
+      "recovery.export": "Esporta quella partita",
+      "recovery.discard": "Eliminala",
+      "recovery.continue": "Continuala (posizione dei tiri: {variant})",
+      "recovery.confirmDiscard": "Eliminare definitivamente la partita non finita? Non si potrà recuperare.",
+
+      "export.title": "Esporta partita",
+      "export.descShare": "Tocca Scarica per salvare il file (oppure Condividi per inviarlo subito). Chiudi la partita solo quando sei sicuro che sia salvata.",
+      "export.descDownload": "Tocca Scarica per salvare il file, poi allegalo da Download/File su WhatsApp, email, ecc. Chiudi la partita solo quando sei sicuro che sia salvata.",
+      "export.download": "Scarica match_export.json",
+      "export.share": "Condividi…",
+      "export.done": "L'ho salvata — chiudi la partita",
+      "export.keep": "Non ancora — continua a registrare",
+      "export.opening": "Apertura della condivisione…",
+      "export.shareFailed": "Condivisione non completata ({reason}). Usa Scarica qui sopra.",
+      "export.shareUnavailable": "La condivisione non è disponibile qui. Usa Scarica qui sopra.",
+
+      "stats.close": "Chiudi",
+      "stats.print": "Stampa / Salva PDF",
+      "stats.player": "Giocatore",
+      "stats.totals": "TOTALE SQUADRA",
+      "stats.points": "PT",
+      "stats.fgm": "TC R",
+      "stats.fga": "TC T",
+      "stats.fg_pct": "TC%",
+      "stats.fg3m": "T3 R",
+      "stats.fg3a": "T3 T",
+      "stats.fg3_pct": "T3%",
+      "stats.ftm": "TL R",
+      "stats.fta": "TL T",
+      "stats.ft_pct": "TL%",
+      "stats.reb_off": "RO",
+      "stats.reb_def": "RD",
+      "stats.assists": "AS",
+      "stats.steals": "PR",
+      "stats.turnovers": "PP",
+      "stats.fouls": "F",
+      "stats.blocks": "ST",
+      "stats.efg_pct": "eFG%",
+      "stats.ts_pct": "TS%",
+
+      "zone.restricted_area": "Semicerchio",
+      "zone.paint_non_ra": "Area (fuori semicerchio)",
+      "zone.left_mid_range": "Media distanza (sinistra)",
+      "zone.center_mid_range": "Media distanza (centro)",
+      "zone.right_mid_range": "Media distanza (destra)",
+      "zone.left_corner_3": "Tripla dall'angolo (sinistra)",
+      "zone.right_corner_3": "Tripla dall'angolo (destra)",
+      "zone.left_wing_3": "Tripla da 45° (sinistra)",
+      "zone.right_wing_3": "Tripla da 45° (destra)",
+      "zone.top_key_3": "Tripla frontale",
+      "zoneShort.restricted_area": "Semic.",
+      "zoneShort.paint_non_ra": "Area",
+      "zoneShort.left_mid_range": "Media S",
+      "zoneShort.center_mid_range": "Media C",
+      "zoneShort.right_mid_range": "Media D",
+      "zoneShort.left_corner_3": "Ang. S",
+      "zoneShort.right_corner_3": "Ang. D",
+      "zoneShort.left_wing_3": "45° S",
+      "zoneShort.right_wing_3": "45° D",
+      "zoneShort.top_key_3": "Frontale"
+    },
+
+    en: {
+      "storage.warning": "⚠️ This browser isn't saving your tagging. Don't close or reload this page, and export before you leave it.",
+
+      "setup.title": "New Match",
+      "setup.roster": "Roster",
+      "setup.loadRoster": "Load roster file…",
+      "setup.playedOn": "Played on",
+      "setup.taggerName": "Your name (tagger)",
+      "setup.taggerNamePlaceholder": "e.g. Marco",
+      "setup.home": "Home team",
+      "setup.away": "Away team",
+      "setup.competition": "Competition",
+      "setup.noCompetition": "No competition (friendly)",
+      "setup.start": "Start match",
+      "setup.offline": "Works fully offline. Data is saved on this device as you tag.",
+      "setup.language": "Language",
+      "setup.labels": "Show players by",
+      "labels.name": "Name",
+      "labels.number": "Jersey number",
+      "setup.noRoster": "No roster loaded yet. Load the roster.json file you were sent, or create one here.",
+      "rosterEdit.create": "Create a roster here",
+      "rosterEdit.edit": "Edit roster",
+      "rosterEdit.download": "Download roster",
+      "rosterEdit.title": "Roster",
+      "rosterEdit.hint": "Jersey number required, name optional. Empty rows are ignored.",
+      "rosterEdit.teamName": "Team {n} name",
+      "rosterEdit.playerName": "Name (optional)",
+      "rosterEdit.addPlayer": "+ Player",
+      "rosterEdit.addTeam": "+ Team",
+      "rosterEdit.removePlayer": "Remove player",
+      "rosterEdit.removeTeam": "Remove team",
+      "rosterEdit.save": "Save roster",
+      "rosterEdit.errTeamName": "Give team {n} a name.",
+      "rosterEdit.errTeamDup": "Two teams are called \"{team}\".",
+      "rosterEdit.errNoNumber": "{name} ({team}) has no jersey number.",
+      "rosterEdit.errNumber": "\"{n}\" isn't a valid jersey number (0–99) — {team}.",
+      "rosterEdit.errNumberDup": "Number {n} is used twice in {team}.",
+      "rosterEdit.errNoPlayers": "{team} has no players.",
+      "setup.rosterLoaded": "Loaded: {teams} ({n} players)",
+      "setup.notJson": "That file isn't valid JSON.",
+      "setup.cantRead": "Couldn't read that file.",
+      "setup.errNoRoster": "Load a roster file first.",
+      "setup.errTeams": "Pick a home and away team.",
+      "setup.errName": "Enter your name.",
+      "setup.shotLocations": "Shot locations: {current} · ",
+      "setup.switchTo": "switch to {other}",
+      "variant.zone": "zones",
+      "variant.freeform": "exact spots",
+
+      "roster.notRoster": "This isn't a roster.json file (expected 'teams' and 'players').",
+      "roster.twoTeams": "The roster needs at least two teams (home and away).",
+      "roster.teamMissing": "Team #{n} is missing an id or name.",
+      "roster.playerMissing": "Player #{n} is missing an id, name, or team.",
+      "roster.unknownTeam": "Player '{name}' belongs to an unknown team.",
+      "roster.noFullTeam": "The roster has no team with real players to track.",
+      "roster.competitionsList": "'competitions' must be a list.",
+
+      "squad.title": "Who's playing today?",
+      "squad.hint": "Tick everyone in today's squad. Only they'll appear for the starting lineup and substitutions.",
+      "squad.all": "All",
+      "squad.none": "None",
+      "squad.next": "Next: starting lineups",
+      "squad.count": "{n} of {total} in the squad",
+      "squad.errEmpty": "Pick at least one player for {team}.",
+      "common.back": "Back",
+      "common.cancel": "Cancel",
+      "common.yes": "Yes",
+      "common.done": "Done",
+
+      "starters.title": "Starting Lineups",
+      "starters.hint": "Pick who's on court to start. You can substitute later.",
+      "starters.scoreOnly": "This side only tracks a running score — no starting lineup needed.",
+      "starters.start": "Start tagging",
+      "starters.count": "{n} of 5 selected",
+      "starters.errEmpty": "Pick at least one on-court player for each team.",
+
+      "tag.undo": "↶ Undo",
+      "tag.undoTitle": "Undo the last event",
+      "tag.stats": "📊 Stats",
+      "tag.finish": "Finish & Export",
+      "tag.subs": "🔄 Substitutions",
+      "tag.ftButton": "+1 (FT)",
+      "tag.eventLog": "Event log",
+      "tag.eventLogBtn": "📋 Event log ({count})",
+      "tag.pauseNudge": "Long pause ({time}): did {period} start?",
+      "tag.pauseYes": "Yes, {period}",
+      "tag.pauseNo": "No",
+      "tag.pauseMarker": "⏸ pause {time}",
+      "tag.noEvents": "No events logged yet.",
+      "tag.movePrev": "Move this event to the previous period",
+      "tag.moveNext": "Move this event to the next period",
+      "tag.delete": "Delete this event",
+      "tag.confirmDelete": "Delete this event? {desc}",
+      "tag.confirmUndo": "Undo {desc}?",
+
+      "event.title": "Log event for {name}",
+      "event.score": "Score",
+      "event.miss": "Miss",
+      "event.ftMade": "FT Made",
+      "event.ftMissed": "FT Missed",
+      "event.offReb": "Off Reb",
+      "event.defReb": "Def Reb",
+      "event.turnover": "Turnover",
+      "event.steal": "Steal",
+      "event.foul": "Foul",
+      "event.block": "Block",
+      "event.sub": "⇄ Sub",
+
+      "desc.made": "Made {points}",
+      "desc.missed": "Missed {points}",
+      "desc.assist": " (ast: {name})",
+      "desc.ftMade": "Made FT",
+      "desc.ftMissed": "Missed FT",
+      "desc.offReb": "Off Reb",
+      "desc.defReb": "Def Reb",
+      "desc.turnover": "Turnover",
+      "desc.steal": "Steal",
+      "desc.foul": "Foul",
+      "desc.drawnBy": " (drawn by: {name})",
+      "desc.block": "Block",
+      "desc.shotBy": " (shot by: {name})",
+
+      "foul.personal": "Personal",
+      "foul.shooting": "Shooting",
+      "foul.offensive": "Offensive",
+      "foul.technical": "Technical",
+      "foul.unsportsmanlike": "Unsportsmanlike",
+      "foul.disqualifying": "Disqualifying",
+      "foulLog.personal": "Personal foul",
+      "foulLog.shooting": "Shooting foul",
+      "foulLog.offensive": "Offensive foul",
+      "foulLog.technical": "Technical foul",
+      "foulLog.unsportsmanlike": "Unsportsmanlike foul",
+      "foulLog.disqualifying": "Disqualifying foul",
+      "foul.titleNoLink": "{type} — {name}",
+      "foul.log": "Log {type}",
+
+      "shot.where": "Where was the shot? — {kind}",
+      "shot.no2": "2PT (no location)",
+      "shot.no3": "3PT (no location)",
+      "shot.flip": "⇄ Basket on the other side",
+      "shot.tapCourt": "Tap the court to mark the spot.",
+      "shot.marked": "{points}PT shot marked — confirm or retry.",
+      "shot.confirm": "Confirm",
+      "shot.retry": "Retry",
+
+      "assist.title": "Assisted by?",
+      "assist.none": "No assist",
+      "assist.cancel": "Cancel this shot",
+
+      "link.stealTitle": "Turnover by? — {team}",
+      "link.stealSkip": "Skip (steal only)",
+      "link.foulTitle": "Drawn by? — {team}",
+      "link.blockTitle": "Whose shot? — {team}",
+      "link.skip": "Skip (no player)",
+
+      "subs.title": "Substitutions",
+      "subs.onCourtPick": "On court — tap who comes off",
+      "subs.onCourtDeselect": "On court — tap again to deselect",
+      "subs.benchReplace": "Bench — tap who replaces {name}",
+      "subs.benchPickFirst": "Bench — pick who comes off first",
+      "subs.benchSendOn": "Bench — tap to send on",
+      "subs.noneOnCourt": "No one on court.",
+      "subs.squadAllOn": "Everyone in today's squad is on court.",
+      "subs.rosterAllOn": "Whole roster is on court.",
+      "subs.outOnly": "Take {name} off without a replacement",
+      "subs.addExtra": "+ Add a player not in today's squad",
+      "subs.hideExtra": "Hide players not in today's squad",
+
+      "finish.confirm": "Finish match and export now?",
+      "recovery.title": "Unfinished match from a different tagger file",
+      "recovery.text": "This device has an unfinished match that was tagged with a different tagger file or roster, so it can't be continued here. Export it to keep it (open the original file to continue tagging), or discard it to start a new match.",
+      "recovery.export": "Export that match",
+      "recovery.discard": "Discard it",
+      "recovery.continue": "Continue it (shot locations: {variant})",
+      "recovery.confirmDiscard": "Delete the unfinished match permanently? It can't be recovered afterwards.",
+
+      "export.title": "Export match",
+      "export.descShare": "Tap Download to save the file (or Share to send it directly). Only clear the match once you're sure it's saved.",
+      "export.descDownload": "Tap Download to save the file, then attach it from your Downloads/Files app in WhatsApp, email, etc. Only clear the match once you're sure it's saved.",
+      "export.download": "Download match_export.json",
+      "export.share": "Share…",
+      "export.done": "I've saved it — clear this match",
+      "export.keep": "Not yet — keep tagging",
+      "export.opening": "Opening share sheet…",
+      "export.shareFailed": "Share didn't complete ({reason}). Use Download above instead.",
+      "export.shareUnavailable": "Sharing isn't available here. Use Download above instead.",
+
+      "stats.close": "Close",
+      "stats.print": "Print / Save as PDF",
+      "stats.player": "Player",
+      "stats.totals": "TEAM TOTALS",
+      "stats.points": "PTS",
+      "stats.fgm": "FGM",
+      "stats.fga": "FGA",
+      "stats.fg_pct": "FG%",
+      "stats.fg3m": "3PM",
+      "stats.fg3a": "3PA",
+      "stats.fg3_pct": "3P%",
+      "stats.ftm": "FTM",
+      "stats.fta": "FTA",
+      "stats.ft_pct": "FT%",
+      "stats.reb_off": "OREB",
+      "stats.reb_def": "DREB",
+      "stats.assists": "AST",
+      "stats.steals": "STL",
+      "stats.turnovers": "TOV",
+      "stats.fouls": "PF",
+      "stats.blocks": "BLK",
+      "stats.efg_pct": "eFG%",
+      "stats.ts_pct": "TS%",
+
+      "zone.restricted_area": "Restricted Area",
+      "zone.paint_non_ra": "Paint (Non-RA)",
+      "zone.left_mid_range": "Mid-Range (Left)",
+      "zone.center_mid_range": "Mid-Range (Center)",
+      "zone.right_mid_range": "Mid-Range (Right)",
+      "zone.left_corner_3": "Corner 3 (Left)",
+      "zone.right_corner_3": "Corner 3 (Right)",
+      "zone.left_wing_3": "Wing 3 (Left)",
+      "zone.right_wing_3": "Wing 3 (Right)",
+      "zone.top_key_3": "Top of Key 3",
+      "zoneShort.restricted_area": "RA",
+      "zoneShort.paint_non_ra": "Paint",
+      "zoneShort.left_mid_range": "Mid L",
+      "zoneShort.center_mid_range": "Mid C",
+      "zoneShort.right_mid_range": "Mid R",
+      "zoneShort.left_corner_3": "Corner L",
+      "zoneShort.right_corner_3": "Corner R",
+      "zoneShort.left_wing_3": "Wing L",
+      "zoneShort.right_wing_3": "Wing R",
+      "zoneShort.top_key_3": "Top Key"
+    }
+  };
+
+  var lang = (function () {
+    try {
+      var saved = window.localStorage.getItem(LANG_STORAGE_KEY);
+      if (saved && STRINGS[saved]) return saved;
+    } catch (e) {}
+    return "it";
+  })();
+
+  // t("squad.count", { n: 3, total: 10 }) -> "3 di 10 convocati". Falls back to English, then
+  // to the key itself, so a missing translation shows up as visibly odd text, not a crash.
+  function t(key, params) {
+    var s = STRINGS[lang][key];
+    if (s === undefined) s = STRINGS.en[key];
+    if (s === undefined) return key;
+    if (params) {
+      s = s.replace(/\{(\w+)\}/g, function (m, name) {
+        return params[name] !== undefined ? String(params[name]) : m;
+      });
+    }
+    return s;
+  }
+
+  function applyStaticTranslations() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(function (el) {
+      el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach(function (el) {
+      el.title = t(el.getAttribute("data-i18n-title"));
+    });
+  }
+
+  function setLanguage(id) {
+    if (!STRINGS[id]) return;
+    lang = id;
+    try { window.localStorage.setItem(LANG_STORAGE_KEY, id); } catch (e) {}
+    applyStaticTranslations();
+  }
+
+  applyStaticTranslations();
+
+  var STORAGE_KEY = "bball_gathering_state_v1";
+  var ROSTER_STORAGE_KEY = "bball_roster_v1";
+  // { teamId: [playerId, ...] } — each team's last "Who's playing today?" squad on this device,
+  // the starting point for its next match (squads rarely change much from game to game).
+  var LAST_SQUAD_STORAGE_KEY = "bball_last_squad_v1";
+
+  // ---------- Storage ----------
+  // localStorage can be missing or throw outright (Android WebViews with DOM storage off,
+  // some private modes, a full quota) — every access goes through these wrappers so that
+  // degrades to "works, but only in memory" with a visible warning instead of a dead app.
+  var storageOk = (function () {
+    try {
+      var probe = "__bball_probe__";
+      window.localStorage.setItem(probe, "1");
+      window.localStorage.removeItem(probe);
+      return true;
+    } catch (e) { return false; }
+  })();
+  var storageWarning = document.getElementById("storage-warning");
+
+  function showStorageWarning() {
+    storageWarning.classList.remove("hidden");
+  }
+
+  function storageGet(key) {
+    if (!storageOk) return null;
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function storageSet(key, value) {
+    if (!storageOk) return;
+    try { window.localStorage.setItem(key, value); } catch (e) { showStorageWarning(); }
+  }
+  function storageRemove(key) {
+    if (!storageOk) return;
+    try { window.localStorage.removeItem(key); } catch (e) {}
+  }
+  if (!storageOk) showStorageWarning();
+
+  // ---------- Roster ----------
+  // A tagger generated by generate.py has its roster embedded. The hosted build (build.py's
+  // site/ output, served over https for iPhones) instead embeds {"hosted": true} with no names,
+  // so no player data ever sits on a public URL — the contributor loads a roster.json file on
+  // the device, and it's kept in storage from then on.
+  var EMBEDDED_ROSTER = JSON.parse(document.getElementById("roster-data").textContent);
+  var IS_HOSTED = !!EMBEDDED_ROSTER.hosted;
+  var EMPTY_ROSTER = { teams: [], players: [], competitions: [] };
+
+  var ROSTER = EMPTY_ROSTER;
+  var teamsById = {};
+  var playersById = {};
+  // A team flagged score_only in the embedded roster (see
+  // analytics-project/roster.py::export_single_team_roster_json) represents an opponent who
+  // hasn't consented to being recorded, or isn't worth rostering: no roster, no starting
+  // lineup, no per-player attribution — just a running score. It's still a real team with one
+  // placeholder player (so a +2/+3/+1 tap is a perfectly ordinary, schema-legal event), the
+  // UI just never lets the tagger treat it like a full roster.
+  var isScoreOnly = {};
+
+  function applyRoster(roster) {
+    ROSTER = roster;
+    teamsById = {};
+    playersById = {};
+    isScoreOnly = {};
+    ROSTER.teams.forEach(function (team) {
+      teamsById[team.id] = team;
+      isScoreOnly[team.id] = !!team.score_only;
+    });
+    ROSTER.players.forEach(function (p) { playersById[p.id] = p; });
+  }
+
+  // Client-side counterpart of generate.py::validate_roster, for a roster.json loaded on the
+  // device (the hosted build) — only the checks the tagger itself depends on not crashing.
+  function validateRoster(r) {
+    if (!r || typeof r !== "object" || !Array.isArray(r.teams) || !Array.isArray(r.players)) {
+      return t("roster.notRoster");
+    }
+    if (r.teams.length < 2) return t("roster.twoTeams");
+    var teamIds = {};
+    for (var i = 0; i < r.teams.length; i++) {
+      var team = r.teams[i];
+      if (!team || !team.id || !team.name) return t("roster.teamMissing", { n: i + 1 });
+      teamIds[team.id] = true;
+    }
+    for (var j = 0; j < r.players.length; j++) {
+      var p = r.players[j];
+      // A roster made on the tagger may leave a name out, but then the number identifies them.
+      var identified = p && (p.name || Number.isInteger(p.jersey_number));
+      if (!p || !p.id || !identified || !p.team_id) return t("roster.playerMissing", { n: j + 1 });
+      if (!teamIds[p.team_id]) return t("roster.unknownTeam", { name: subsLabel(p) });
+    }
+    var fullTeams = r.teams.filter(function (team) { return !team.score_only; });
+    if (fullTeams.length === 0) return t("roster.noFullTeam");
+    if (r.competitions !== undefined && !Array.isArray(r.competitions)) return t("roster.competitionsList");
+    return null;
+  }
+
+  function loadInitialRoster() {
+    if (!IS_HOSTED) return EMBEDDED_ROSTER;
+    var raw = storageGet(ROSTER_STORAGE_KEY);
+    if (!raw) return EMPTY_ROSTER;
+    try {
+      var stored = JSON.parse(raw);
+      return validateRoster(stored) ? EMPTY_ROSTER : stored;
+    } catch (e) { return EMPTY_ROSTER; }
+  }
+  applyRoster(loadInitialRoster());
+
+  // ---------- Player labels ----------
+  // How players are shown once tagging starts: by name (the default) or by jersey number,
+  // which is what a tagger actually reads off the court. Per device, switched on the setup
+  // screen. Either way the other half is shown smaller alongside, and a player missing the
+  // chosen half (no number in the roster, or no name in a roster made on the tagger) falls
+  // back to the other.
+  var LABEL_MODE_STORAGE_KEY = "bball_label_mode_v1";
+  var labelMode = storageGet(LABEL_MODE_STORAGE_KEY) === "number" ? "number" : "name";
+
+  function jerseyText(p) {
+    return p.jersey_number !== null && p.jersey_number !== undefined ? "#" + p.jersey_number : "";
+  }
+
+  // [primary, secondary] for the chosen mode; secondary may be "".
+  function playerLabelParts(p) {
+    var num = jerseyText(p), name = p.name || "";
+    if (labelMode === "number") return num ? [num, name] : [name, ""];
+    return name ? [name, num] : [num, ""];
+  }
+
+  // One compact label: event log lines, confirmations, modal titles.
+  function playerShort(p) {
+    return playerLabelParts(p)[0];
+  }
+
+  // Both halves on one line: pick lists (assist, drawn by, ...).
+  function playerFull(p) {
+    var parts = playerLabelParts(p);
+    if (!parts[1]) return parts[0];
+    return labelMode === "number" ? parts[0] + " " + parts[1] : parts[0] + " (" + parts[1] + ")";
+  }
+
+  function fillPlayerButton(btn, p) {
+    var parts = playerLabelParts(p);
+    btn.classList.toggle("by-number", labelMode === "number" && parts[0].charAt(0) === "#");
+    btn.innerHTML = '<div class="name">' + escapeHtml(parts[0]) + '</div>' +
+                    (parts[1] ? '<div class="jersey">' + escapeHtml(parts[1]) + '</div>' : "");
+  }
+
+  function playersForTeam(teamId) {
+    return ROSTER.players.filter(function (p) { return p.team_id === teamId; });
+  }
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(SVG_NS, tag);
+    for (var key in attrs) { el.setAttribute(key, attrs[key]); }
+    return el;
+  }
+
+  // ---------- Court geometry (both shot pickers) ----------
+  // Same real-world proportions (feet) as analytics-project/zones.py and ui.py's
+  // shot_zone_court_chart, so both pickers look like the analytics-side shot chart. Pickers
+  // draw in a "0 0 50 32" viewBox — 1 SVG unit = 1 foot, so a tapped point's SVG-space
+  // coordinates ARE the feet coordinates directly, no scale conversion needed.
+  var COURT_HOOP = [25, 5.25];
+  var COURT_RA_R = 4;
+  var COURT_THREE_R = 23.75;
+  var COURT_KEY_X0 = 17, COURT_KEY_X1 = 33, COURT_KEY_Y1 = 19;
+  var COURT_FT_CIRCLE_R = 6;
+  var COURT_CORNER_X0 = 3, COURT_CORNER_X1 = 47;
+  var COURT_TOP = 32;
+
+  function courtArcPoints(cx, cy, r, theta1Deg, theta2Deg, n) {
+    // Logical coordinates (y increasing away from the baseline) — NOT pre-flipped for screen
+    // space. The single <g> flip in renderCourtMap() handles that for every element uniformly,
+    // this and everything else just deals in logical court coordinates.
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var theta = (theta1Deg + (theta2Deg - theta1Deg) * i / n) * Math.PI / 180;
+      pts.push([cx + r * Math.cos(theta), cy + r * Math.sin(theta)]);
+    }
+    return pts;
+  }
+
+  function courtThetaAtX(cx, cy, r, x) {
+    var dx = x - cx;
+    var dy = Math.sqrt(Math.max(r * r - dx * dx, 0));
+    return Math.atan2(dy, dx) * 180 / Math.PI;
+  }
+
+  function courtPathFrom(points) {
+    return "M " + points.map(function (p) { return p[0].toFixed(2) + "," + p[1].toFixed(2); }).join(" L ");
+  }
+
+  // Same rule the real 3PT line follows: a fixed corner cutoff (the line runs straight near
+  // the sideline, not on the arc, since the arc would dip out of bounds there) plus the arc
+  // radius everywhere else.
+  function isThreePointer(x, y) {
+    if (x < COURT_CORNER_X0 || x > COURT_CORNER_X1) return true;
+    var dx = x - COURT_HOOP[0], dy = y - COURT_HOOP[1];
+    return Math.sqrt(dx * dx + dy * dy) >= COURT_THREE_R;
+  }
+
+  function renderCourtLines(container) {
+    var hx = COURT_HOOP[0], hy = COURT_HOOP[1];
+    var thetaCornerL = courtThetaAtX(hx, hy, COURT_THREE_R, COURT_CORNER_X0);
+    var thetaCornerR = courtThetaAtX(hx, hy, COURT_THREE_R, COURT_CORNER_X1);
+    var cornerY = hy + Math.sqrt(COURT_THREE_R * COURT_THREE_R - Math.pow(hx - COURT_CORNER_X0, 2));
+
+    var threeLine = [[COURT_CORNER_X0, 0], [COURT_CORNER_X0, cornerY]]
+      .concat(courtArcPoints(hx, hy, COURT_THREE_R, thetaCornerL, thetaCornerR, 24))
+      .concat([[COURT_CORNER_X1, 0]]);
+    var raLine = [[hx - COURT_RA_R, 0]].concat(courtArcPoints(hx, hy, COURT_RA_R, 180, 0, 16)).concat([[hx + COURT_RA_R, 0]]);
+
+    [
+      [[0, 0], [50, 0]],
+      [[COURT_KEY_X0, 0], [COURT_KEY_X0, COURT_KEY_Y1], [COURT_KEY_X1, COURT_KEY_Y1], [COURT_KEY_X1, 0]],
+      raLine,
+      [[22, 4], [28, 4]]
+    ].forEach(function (path) {
+      container.appendChild(svgEl("path", { "class": "court-line", d: courtPathFrom(path) }));
+    });
+
+    // The one deliberate accent, so the tagger can see at a glance which side of the line a
+    // tap falls on.
+    container.appendChild(svgEl("path", { "class": "court-line-three", d: courtPathFrom(threeLine) }));
+
+    container.appendChild(svgEl("circle", { "class": "court-line", cx: hx, cy: COURT_KEY_Y1, r: COURT_FT_CIRCLE_R }));
+    container.appendChild(svgEl("circle", { "class": "court-line", cx: hx, cy: hy, r: 0.75 }));
+  }
+
+  // ---------- Shot location picker interface ----------
+  // The zone-tap and freeform-tap variants each define their own openZoneModal(shotEvent,
+  // isMade) (called below from handleEventTypeAction), plus the hooks below — the only
+  // spots the rest of this file needs to vary by variant. Both are plain function
+  // declarations at this same top-level scope, so whichever variant's picker.js is
+  // concatenated after this file simply redeclares the ones it needs; the later declaration
+  // wins once boot runs (this is ordinary function-hoisting behavior, not a real override
+  // mechanism — see build.py). Only the zone variant needs to redeclare shotLocationSummary
+  // (a raw shot_x/shot_y pair isn't meaningful in a compact log line); both variants must
+  // redeclare applyExportShotLocation and shotPickerVariant, since each exports different
+  // fields.
+  function shotLocationSummary(ev) { return ""; }
+  function applyExportShotLocation(ev, out) {}
+  // Which picker variant this file is. Saved on the match so a match started in one variant is
+  // never resumed in the other (each exports only its own location fields, so the other's
+  // locations would be silently dropped) — see isStateCompatible.
+  function shotPickerVariant() { return ""; }
+
+  // The hosted build serves each variant as its own page (build.py's SITE_PAGES) — zones, the
+  // standard picker, is the site's front page.
+  var VARIANT_INFO = {
+    zone: { labelKey: "variant.zone", url: "./" },
+    freeform: { labelKey: "variant.freeform", url: "freeform.html" }
+  };
+
+  // ---------- State ----------
+  var state = null;
+
+  function loadState() {
+    var raw = storageGet(STORAGE_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function saveState() {
+    storageSet(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function clearState() {
+    storageRemove(STORAGE_KEY);
+    state = null;
+  }
+
+  // Every tagger file opened from local storage (file://) can share one origin, and so one
+  // saved match: open a single-team tagger while a full-tagger match is still unfinished (or a
+  // tagger generated from an older roster) and the saved match references teams/players this
+  // file doesn't know. Resuming it would crash on the first name lookup, so it's checked first.
+  function isStateCompatible(s) {
+    if (!s || !s.match || !Array.isArray(s.events)) return false;
+    // Matches saved before variants were recorded have none — accept those as before.
+    if (s.variant && s.variant !== shotPickerVariant()) return false;
+    if (!teamsById[s.match.home_team_id] || !teamsById[s.match.away_team_id]) return false;
+    var eventsOk = s.events.every(function (ev) {
+      return teamsById[ev.team_id] && playersById[ev.player_id] &&
+        (!ev.secondary_player_id || playersById[ev.secondary_player_id]);
+    });
+    if (!eventsOk) return false;
+    var allKnown = function (map) {
+      return Object.keys(map || {}).every(function (teamId) {
+        return (map[teamId] || []).every(function (pid) { return !!playersById[pid]; });
+      });
+    };
+    return allKnown(s.onCourt) && allKnown(s.squad);
+  }
+
+  // ---------- Screens ----------
+  var setupScreen = document.getElementById("setup-screen");
+  var squadScreen = document.getElementById("squad-screen");
+  var startersScreen = document.getElementById("starters-screen");
+  var taggingScreen = document.getElementById("tagging-screen");
+
+  function showScreen(name) {
+    setupScreen.classList.toggle("hidden", name !== "setup");
+    squadScreen.classList.toggle("hidden", name !== "squad");
+    // A new screen starts at its top — otherwise it opens at whatever scroll position the last
+    // one was left at (e.g. scrolled down to the setup screen's Start button), hiding its header.
+    window.scrollTo(0, 0);
+    startersScreen.classList.toggle("hidden", name !== "starters");
+    taggingScreen.classList.toggle("hidden", name !== "tagging");
+    rosterScreen.classList.toggle("hidden", name !== "roster");
+  }
+
+  // ---------- Setup screen ----------
+  var playedOnInput = document.getElementById("played-on-input");
+  var taggerNameInput = document.getElementById("tagger-name-input");
+  var homeTeamPicker = document.getElementById("home-team-picker");
+  var awayTeamPicker = document.getElementById("away-team-picker");
+  var competitionSelect = document.getElementById("competition-select");
+  var setupError = document.getElementById("setup-error");
+
+  var selectedHomeTeamId = null;
+  var selectedAwayTeamId = null;
+
+  function resetSetupSelection() {
+    selectedHomeTeamId = ROSTER.teams[0] ? ROSTER.teams[0].id : null;
+    selectedAwayTeamId = ROSTER.teams[1] ? ROSTER.teams[1].id : null;
+    playedOnInput.value = "";  // back to today on the next renderSetupScreen()
+  }
+  resetSetupSelection();
+
+  // Built once per roster, not on every renderSetupScreen() call, so picking a team (which
+  // re-renders the screen) doesn't reset whatever competition the tagger already selected.
+  function populateCompetitionSelect() {
+    competitionSelect.innerHTML = "";
+    var noneOption = document.createElement("option");
+    noneOption.value = "";
+    noneOption.textContent = t("setup.noCompetition");
+    competitionSelect.appendChild(noneOption);
+    (ROSTER.competitions || []).forEach(function (c) {
+      var opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name;
+      competitionSelect.appendChild(opt);
+    });
+  }
+  populateCompetitionSelect();
+
+  // ---------- Roster loader (hosted build only) ----------
+  var rosterCard = document.getElementById("roster-card");
+  var rosterStatus = document.getElementById("roster-status");
+  var rosterFileInput = document.getElementById("roster-file-input");
+  var rosterError = document.getElementById("roster-error");
+
+  function renderRosterCard() {
+    rosterCard.classList.toggle("hidden", !IS_HOSTED);
+    if (!IS_HOSTED) return;
+    document.getElementById("roster-own-actions").classList.toggle("hidden", !ROSTER.tagger_made);
+    var fullTeams = ROSTER.teams.filter(function (team) { return !team.score_only; });
+    rosterStatus.textContent = ROSTER.teams.length === 0
+      ? t("setup.noRoster")
+      : t("setup.rosterLoaded", {
+          teams: fullTeams.map(function (team) { return team.name; }).join(", "),
+          n: ROSTER.players.filter(function (p) { return !isScoreOnly[p.team_id]; }).length
+        });
+  }
+
+  rosterFileInput.addEventListener("change", function () {
+    var file = rosterFileInput.files && rosterFileInput.files[0];
+    rosterFileInput.value = "";
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parsed = null;
+      try { parsed = JSON.parse(reader.result); } catch (e) {}
+      var err = parsed ? validateRoster(parsed) : t("setup.notJson");
+      rosterError.classList.toggle("hidden", !err);
+      rosterError.textContent = err || "";
+      if (err) return;
+      storageSet(ROSTER_STORAGE_KEY, JSON.stringify(parsed));
+      applyRoster(parsed);
+      resetSetupSelection();
+      populateCompetitionSelect();
+      renderSetupScreen();
+    };
+    reader.onerror = function () {
+      rosterError.textContent = t("setup.cantRead");
+      rosterError.classList.remove("hidden");
+    };
+    reader.readAsText(file);
+  });
+
+  // ---------- Roster editor (hosted build only) ----------
+  // For a game with no roster file: teams and players typed in on the phone. Jersey number is
+  // required (it's what the tagger sees on court), name optional. Saved like a loaded roster
+  // (ROSTER_STORAGE_KEY) but flagged tagger_made, which makes each match started from it
+  // export the roster alongside its events (tagger_roster) — the analytics import then matches
+  // each team/player to an existing one or creates it. Editing keeps every id, so matches
+  // already exported still line up with it. Downloading it lets a second phone tag with the
+  // very same ids.
+  var rosterScreen = document.getElementById("roster-screen");
+  var rosterEditor = document.getElementById("roster-editor");
+  var rosterEditorError = document.getElementById("roster-editor-error");
+  var rosterDraft = null;
+  var ROSTER_EDITOR_BLANK_ROWS = 5;
+
+  // UUID v4. crypto.randomUUID only exists in secure contexts; the hosted site is one, but a
+  // plain getRandomValues fallback costs nothing.
+  function newId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    var h = Array.prototype.map.call(b, function (x) { return (x + 0x100).toString(16).slice(1); }).join("");
+    return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" + h.slice(16, 20) + "-" + h.slice(20);
+  }
+
+  function blankPlayerRow() { return { id: newId(), number: "", name: "" }; }
+
+  function blankTeam() {
+    var rows = [];
+    for (var i = 0; i < ROSTER_EDITOR_BLANK_ROWS; i++) rows.push(blankPlayerRow());
+    return { id: newId(), name: "", players: rows };
+  }
+
+  function openRosterEditor(editCurrent) {
+    if (editCurrent && ROSTER.tagger_made) {
+      rosterDraft = {
+        teams: ROSTER.teams.map(function (team) {
+          return {
+            id: team.id,
+            name: team.name,
+            players: playersForTeam(team.id).slice().sort(byJersey).map(function (p) {
+              return { id: p.id, number: String(p.jersey_number), name: p.name || "" };
+            }).concat([blankPlayerRow()])
+          };
+        })
+      };
+    } else {
+      rosterDraft = { teams: [blankTeam(), blankTeam()] };
+    }
+    rosterEditorError.classList.add("hidden");
+    renderRosterEditor();
+    showScreen("roster");
+  }
+
+  function textInput(value, placeholder, onInput, extraClass) {
+    var input = document.createElement("input");
+    input.type = "text";
+    input.value = value;
+    input.placeholder = placeholder;
+    if (extraClass) input.className = extraClass;
+    input.addEventListener("input", function () { onInput(input.value); });
+    return input;
+  }
+
+  // Inputs write straight into rosterDraft; only adding/removing rows re-renders, so typing
+  // never loses focus.
+  function renderRosterEditor() {
+    rosterEditor.innerHTML = "";
+    rosterDraft.teams.forEach(function (team, ti) {
+      var card = document.createElement("div");
+      card.className = "card roster-team-card";
+
+      var nameRow = document.createElement("div");
+      nameRow.className = "team-name-row";
+      nameRow.appendChild(textInput(team.name, t("rosterEdit.teamName", { n: ti + 1 }), function (v) { team.name = v; }));
+      if (rosterDraft.teams.length > 2) {
+        var removeTeam = document.createElement("button");
+        removeTeam.className = "roster-remove-btn";
+        removeTeam.textContent = "✕";
+        removeTeam.title = t("rosterEdit.removeTeam");
+        removeTeam.addEventListener("click", function () {
+          rosterDraft.teams.splice(ti, 1);
+          renderRosterEditor();
+        });
+        nameRow.appendChild(removeTeam);
+      }
+      card.appendChild(nameRow);
+
+      team.players.forEach(function (row, pi) {
+        var line = document.createElement("div");
+        line.className = "roster-player-row";
+        var num = textInput(row.number, "#", function (v) { row.number = v; }, "num");
+        num.inputMode = "numeric";
+        num.maxLength = 2;
+        line.appendChild(num);
+        line.appendChild(textInput(row.name, t("rosterEdit.playerName"), function (v) { row.name = v; }));
+        var remove = document.createElement("button");
+        remove.className = "roster-remove-btn";
+        remove.textContent = "✕";
+        remove.title = t("rosterEdit.removePlayer");
+        remove.addEventListener("click", function () {
+          team.players.splice(pi, 1);
+          renderRosterEditor();
+        });
+        line.appendChild(remove);
+        card.appendChild(line);
+      });
+
+      var addPlayer = document.createElement("button");
+      addPlayer.className = "btn-ghost btn-block";
+      addPlayer.textContent = t("rosterEdit.addPlayer");
+      addPlayer.addEventListener("click", function () {
+        team.players.push(blankPlayerRow());
+        renderRosterEditor();
+        var inputs = rosterEditor.querySelectorAll(".roster-team-card")[ti].querySelectorAll("input.num");
+        inputs[inputs.length - 1].focus();
+      });
+      card.appendChild(addPlayer);
+      rosterEditor.appendChild(card);
+    });
+  }
+
+  // The draft as a roster, or an error message. Rows with neither number nor name are just
+  // unused blanks and are skipped.
+  function rosterFromDraft() {
+    var teams = [], players = [], seenNames = {};
+    for (var ti = 0; ti < rosterDraft.teams.length; ti++) {
+      var team = rosterDraft.teams[ti];
+      var teamName = team.name.trim();
+      if (!teamName) return { error: t("rosterEdit.errTeamName", { n: ti + 1 }) };
+      if (seenNames[teamName.toLowerCase()]) return { error: t("rosterEdit.errTeamDup", { team: teamName }) };
+      seenNames[teamName.toLowerCase()] = true;
+      teams.push({ id: team.id, name: teamName });
+      var seenNumbers = {}, count = 0;
+      for (var pi = 0; pi < team.players.length; pi++) {
+        var row = team.players[pi];
+        var numText = row.number.trim(), name = row.name.trim();
+        if (!numText && !name) continue;
+        if (!numText) return { error: t("rosterEdit.errNoNumber", { name: name, team: teamName }) };
+        if (!/^\d{1,2}$/.test(numText)) return { error: t("rosterEdit.errNumber", { n: numText, team: teamName }) };
+        var number = parseInt(numText, 10);
+        if (seenNumbers[number]) return { error: t("rosterEdit.errNumberDup", { n: number, team: teamName }) };
+        seenNumbers[number] = true;
+        players.push({ id: row.id, name: name, jersey_number: number, team_id: team.id });
+        count += 1;
+      }
+      if (count === 0) return { error: t("rosterEdit.errNoPlayers", { team: teamName }) };
+    }
+    return { roster: { teams: teams, players: players, competitions: [], tagger_made: true } };
+  }
+
+  // What a match started from a tagger-made roster exports: its two teams and their players,
+  // names left out (null) when none was typed.
+  function taggerRosterFor(match) {
+    var teamIds = [match.home_team_id, match.away_team_id];
+    return {
+      teams: teamIds.map(function (id) { return { id: id, name: teamsById[id].name }; }),
+      players: ROSTER.players.filter(function (p) { return teamIds.indexOf(p.team_id) !== -1; })
+        .map(function (p) {
+          return { id: p.id, name: p.name || null, jersey_number: p.jersey_number, team_id: p.team_id };
+        })
+    };
+  }
+
+  document.getElementById("roster-create-btn").addEventListener("click", function () { openRosterEditor(false); });
+  document.getElementById("roster-edit-btn").addEventListener("click", function () { openRosterEditor(true); });
+  document.getElementById("roster-add-team-btn").addEventListener("click", function () {
+    rosterDraft.teams.push(blankTeam());
+    renderRosterEditor();
+  });
+  document.getElementById("roster-back-btn").addEventListener("click", function () {
+    rosterDraft = null;
+    showScreen("setup");
+  });
+  document.getElementById("roster-save-btn").addEventListener("click", function () {
+    var result = rosterFromDraft();
+    rosterEditorError.classList.toggle("hidden", !result.error);
+    rosterEditorError.textContent = result.error || "";
+    if (result.error) return;
+    storageSet(ROSTER_STORAGE_KEY, JSON.stringify(result.roster));
+    applyRoster(result.roster);
+    rosterError.classList.add("hidden");
+    resetSetupSelection();
+    populateCompetitionSelect();
+    rosterDraft = null;
+    showScreen("setup");
+    renderSetupScreen();
+  });
+
+  document.getElementById("roster-download-btn").addEventListener("click", function () {
+    var slug = ROSTER.teams.map(function (team) { return team.name; }).join("-")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    var blob = new Blob([JSON.stringify(ROSTER, null, 2)], { type: "application/json" });
+    var link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "roster-" + (slug || "tagger") + ".json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(link.href); }, 10000);
+  });
+
+  function renderTeamPicker(container, teams, selectedId, disabledId, onPick) {
+    container.innerHTML = "";
+    var row = document.createElement("div");
+    row.className = "team-pick-row";
+    teams.forEach(function (team) {
+      var btn = document.createElement("button");
+      btn.textContent = team.name;
+      if (team.id === selectedId) btn.classList.add("selected");
+      if (team.id === disabledId) {
+        btn.disabled = true;
+      } else {
+        btn.addEventListener("click", function () { onPick(team.id); });
+      }
+      row.appendChild(btn);
+    });
+    container.appendChild(row);
+  }
+
+  // The away team can never be the home team, so rather than let the tagger pick a conflicting
+  // pair, whichever team is currently selected as home is shown disabled (not removed) in the
+  // away picker — that way the away section always shows the full roster, and it's visually
+  // obvious which team is off-limits and why, instead of the picker silently shrinking.
+  // Hosted build only — the local tagger files are separate downloads, there's no page to link.
+  // Only on the setup screen, i.e. never mid-match; a match started on one page and opened on
+  // the other lands in the recovery prompt, which links back (see openRecoveryModal).
+  var variantSwitch = document.getElementById("variant-switch");
+
+  function renderVariantSwitch() {
+    var current = shotPickerVariant();
+    var other = current === "zone" ? "freeform" : "zone";
+    variantSwitch.classList.toggle("hidden", !IS_HOSTED || !VARIANT_INFO[current]);
+    if (!IS_HOSTED || !VARIANT_INFO[current]) return;
+    variantSwitch.innerHTML = "";
+    variantSwitch.appendChild(document.createTextNode(t("setup.shotLocations", { current: t(VARIANT_INFO[current].labelKey) })));
+    var link = document.createElement("a");
+    link.href = VARIANT_INFO[other].url;
+    link.textContent = t("setup.switchTo", { other: t(VARIANT_INFO[other].labelKey) });
+    variantSwitch.appendChild(link);
+  }
+
+  // Per device (see i18n.js). Switching re-labels everything already on screen; the setup
+  // screen is the only place it's offered, so that's the only screen to re-render.
+  var langSwitch = document.getElementById("lang-switch");
+
+  function renderLanguageSwitch() {
+    langSwitch.innerHTML = "";
+    LANGUAGES.forEach(function (l) {
+      var btn = document.createElement("button");
+      btn.textContent = l.label;
+      btn.className = "btn-ghost";
+      if (l.id === lang) btn.classList.add("selected");
+      btn.addEventListener("click", function () {
+        if (l.id === lang) return;
+        setLanguage(l.id);
+        populateCompetitionSelectKeepingChoice();
+        renderSetupScreen();
+      });
+      langSwitch.appendChild(btn);
+    });
+  }
+
+  function populateCompetitionSelectKeepingChoice() {
+    var chosen = competitionSelect.value;
+    populateCompetitionSelect();
+    competitionSelect.value = chosen;
+  }
+
+  var labelModePicker = document.getElementById("label-mode-picker");
+
+  function renderLabelModePicker() {
+    renderTeamPicker(labelModePicker, [
+      { id: "name", name: t("labels.name") },
+      { id: "number", name: t("labels.number") }
+    ], labelMode, null, function (mode) {
+      labelMode = mode;
+      storageSet(LABEL_MODE_STORAGE_KEY, mode);
+      renderLabelModePicker();
+    });
+  }
+
+  function renderSetupScreen() {
+    renderLanguageSwitch();
+    renderLabelModePicker();
+    renderRosterCard();
+    renderVariantSwitch();
+    // Only a default: this re-renders on every team pick, which mustn't undo a chosen date.
+    if (!playedOnInput.value) playedOnInput.valueAsDate = new Date();
+    renderTeamPicker(homeTeamPicker, ROSTER.teams, selectedHomeTeamId, null, function (id) {
+      selectedHomeTeamId = id;
+      if (selectedAwayTeamId === id) {
+        var fallback = ROSTER.teams.filter(function (team) { return team.id !== id; })[0];
+        selectedAwayTeamId = fallback ? fallback.id : null;
+      }
+      renderSetupScreen();
+    });
+    renderTeamPicker(awayTeamPicker, ROSTER.teams, selectedAwayTeamId, selectedHomeTeamId, function (id) {
+      selectedAwayTeamId = id;
+      renderSetupScreen();
+    });
+  }
+
+  document.getElementById("start-match-btn").addEventListener("click", function () {
+    setupError.classList.add("hidden");
+    if (ROSTER.teams.length < 2) {
+      setupError.textContent = t("setup.errNoRoster");
+      setupError.classList.remove("hidden");
+      return;
+    }
+    if (!selectedHomeTeamId || !selectedAwayTeamId) {
+      setupError.textContent = t("setup.errTeams");
+      setupError.classList.remove("hidden");
+      return;
+    }
+    if (!taggerNameInput.value.trim()) {
+      setupError.textContent = t("setup.errName");
+      setupError.classList.remove("hidden");
+      return;
+    }
+
+    pendingMatch = {
+      played_on: playedOnInput.value,
+      home_team_id: selectedHomeTeamId,
+      away_team_id: selectedAwayTeamId,
+      competition_id: competitionSelect.value || null
+    };
+    pendingImportedBy = taggerNameInput.value.trim();
+    enterSquadScreen();
+  });
+
+  // ---------- Who's playing today (matchday squad) screen ----------
+  // Not every rostered player dresses for every match. Picking the squad up front keeps the
+  // starters screen and the Substitutions bench to the players actually there, and the squad
+  // is exported so the analytics side can tell a DNP (in the squad, never got on court) from
+  // someone who simply wasn't there. Score-only sides are skipped — no people to pick.
+  var squadSelection = {};
+  var squadActiveTeamId = null;
+  var pendingSquad = null;
+
+  var squadTeamTabs = document.getElementById("squad-team-tabs");
+  var squadCountLabel = document.getElementById("squad-count-label");
+  var squadGrid = document.getElementById("squad-grid");
+  var squadError = document.getElementById("squad-error");
+
+  function trackedTeamIds(match) {
+    return [match.home_team_id, match.away_team_id].filter(function (id) { return !isScoreOnly[id]; });
+  }
+
+  function loadLastSquads() {
+    try { return JSON.parse(storageGet(LAST_SQUAD_STORAGE_KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+
+  function enterSquadScreen() {
+    var last = loadLastSquads();
+    squadSelection = {};
+    trackedTeamIds(pendingMatch).forEach(function (teamId) {
+      var rosterIds = playersForTeam(teamId).map(function (p) { return p.id; });
+      // Last squad used for this team on this device (minus anyone no longer on the roster);
+      // everyone the first time.
+      var remembered = (last[teamId] || []).filter(function (id) { return rosterIds.indexOf(id) !== -1; });
+      squadSelection[teamId] = remembered.length ? remembered : rosterIds;
+    });
+    squadActiveTeamId = trackedTeamIds(pendingMatch)[0];
+    squadError.classList.add("hidden");
+    showScreen("squad");
+    renderSquadScreen();
+  }
+
+  function renderSquadScreen() {
+    squadTeamTabs.innerHTML = "";
+    trackedTeamIds(pendingMatch).forEach(function (teamId) {
+      var btn = document.createElement("button");
+      btn.textContent = teamsById[teamId].name;
+      btn.classList.add(teamId === pendingMatch.home_team_id ? "team-home" : "team-away");
+      if (teamId === squadActiveTeamId) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        squadActiveTeamId = teamId;
+        renderSquadScreen();
+      });
+      squadTeamTabs.appendChild(btn);
+    });
+
+    var roster = playersForTeam(squadActiveTeamId).slice().sort(byJersey);
+    var selected = squadSelection[squadActiveTeamId];
+    squadCountLabel.textContent = t("squad.count", { n: selected.length, total: roster.length });
+    squadGrid.classList.toggle("team-context-home", squadActiveTeamId === pendingMatch.home_team_id);
+    squadGrid.classList.toggle("team-context-away", squadActiveTeamId === pendingMatch.away_team_id);
+    squadGrid.innerHTML = "";
+    roster.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.className = "player-btn";
+      if (selected.indexOf(p.id) !== -1) btn.classList.add("selected");
+      // One compact line ("#7 Name", like the Substitutions lists) — a tick-list of a whole
+      // roster, not tap targets used all game, so it shouldn't take several screens to scroll.
+      btn.innerHTML = '<div class="name">' + escapeHtml(subsLabel(p)) + '</div>';
+      btn.addEventListener("click", function () {
+        var idx = selected.indexOf(p.id);
+        if (idx === -1) selected.push(p.id); else selected.splice(idx, 1);
+        renderSquadScreen();
+      });
+      squadGrid.appendChild(btn);
+    });
+  }
+
+  document.getElementById("squad-all-btn").addEventListener("click", function () {
+    squadSelection[squadActiveTeamId] = playersForTeam(squadActiveTeamId).map(function (p) { return p.id; });
+    renderSquadScreen();
+  });
+  document.getElementById("squad-none-btn").addEventListener("click", function () {
+    squadSelection[squadActiveTeamId] = [];
+    renderSquadScreen();
+  });
+
+  document.getElementById("squad-continue-btn").addEventListener("click", function () {
+    squadError.classList.add("hidden");
+    var empty = trackedTeamIds(pendingMatch).filter(function (id) { return squadSelection[id].length === 0; })[0];
+    if (empty) {
+      squadActiveTeamId = empty;
+      renderSquadScreen();
+      squadError.textContent = t("squad.errEmpty", { team: teamsById[empty].name });
+      squadError.classList.remove("hidden");
+      return;
+    }
+    var last = loadLastSquads();
+    pendingSquad = {};
+    trackedTeamIds(pendingMatch).forEach(function (teamId) {
+      pendingSquad[teamId] = squadSelection[teamId].slice();
+      last[teamId] = squadSelection[teamId].slice();
+    });
+    storageSet(LAST_SQUAD_STORAGE_KEY, JSON.stringify(last));
+    enterStartersScreen();
+  });
+
+  document.getElementById("squad-back-btn").addEventListener("click", function () {
+    showScreen("setup");
+  });
+
+  // ---------- Starting lineups screen ----------
+  // Only the 5 players actually on court are offered on the tagging screen, so the tagger
+  // doesn't have to hunt through the whole roster for every event. A team's default starting
+  // five can be pre-encoded on its roster entry (team.starters, set by whoever maintains
+  // roster.json); if it's missing the tagger just picks manually here instead.
+  var pendingMatch = null;
+  var pendingImportedBy = null;
+  var startersSelection = {};
+  var startersActiveTeamId = null;
+
+  var startersTeamTabs = document.getElementById("starters-team-tabs");
+  var startersCountLabel = document.getElementById("starters-count-label");
+  var startersGrid = document.getElementById("starters-grid");
+  var startersScoreOnlyNote = document.getElementById("starters-score-only-note");
+  var startersError = document.getElementById("starters-error");
+
+  function enterStartersScreen() {
+    startersSelection = {};
+    [pendingMatch.home_team_id, pendingMatch.away_team_id].forEach(function (teamId) {
+      if (isScoreOnly[teamId]) {
+        startersSelection[teamId] = [];
+        return;
+      }
+      var team = teamsById[teamId];
+      // A default starter who isn't in today's squad just isn't pre-selected.
+      var preset = (team.starters || []).filter(function (id) {
+        return playersById[id] && playersById[id].team_id === teamId && pendingSquad[teamId].indexOf(id) !== -1;
+      });
+      startersSelection[teamId] = preset.slice(0, 5);
+    });
+    startersActiveTeamId = pendingMatch.home_team_id;
+    startersError.classList.add("hidden");
+    showScreen("starters");
+    renderStartersScreen();
+  }
+
+  function renderStartersScreen() {
+    startersTeamTabs.innerHTML = "";
+    [
+      { id: pendingMatch.home_team_id, side: "team-home" },
+      { id: pendingMatch.away_team_id, side: "team-away" }
+    ].forEach(function (entry) {
+      var btn = document.createElement("button");
+      btn.textContent = teamsById[entry.id].name;
+      btn.classList.add(entry.side);
+      if (entry.id === startersActiveTeamId) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        startersActiveTeamId = entry.id;
+        renderStartersScreen();
+      });
+      startersTeamTabs.appendChild(btn);
+    });
+
+    var scoreOnly = isScoreOnly[startersActiveTeamId];
+    startersGrid.classList.toggle("hidden", scoreOnly);
+    startersCountLabel.classList.toggle("hidden", scoreOnly);
+    startersScoreOnlyNote.classList.toggle("hidden", !scoreOnly);
+    if (scoreOnly) {
+      startersGrid.innerHTML = "";
+      return;
+    }
+
+    var selected = startersSelection[startersActiveTeamId] || [];
+    startersCountLabel.textContent = t("starters.count", { n: selected.length });
+
+    startersGrid.classList.toggle("team-context-home", startersActiveTeamId === pendingMatch.home_team_id);
+    startersGrid.classList.toggle("team-context-away", startersActiveTeamId === pendingMatch.away_team_id);
+    startersGrid.innerHTML = "";
+    playersForTeam(startersActiveTeamId).filter(function (p) {
+      return pendingSquad[startersActiveTeamId].indexOf(p.id) !== -1;
+    }).forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.className = "player-btn";
+      if (selected.indexOf(p.id) !== -1) btn.classList.add("selected");
+      fillPlayerButton(btn, p);
+      btn.addEventListener("click", function () { toggleStarter(startersActiveTeamId, p.id); });
+      startersGrid.appendChild(btn);
+    });
+  }
+
+  function toggleStarter(teamId, playerId) {
+    var list = startersSelection[teamId] || (startersSelection[teamId] = []);
+    var idx = list.indexOf(playerId);
+    if (idx !== -1) {
+      list.splice(idx, 1);
+    } else {
+      if (list.length >= 5) return;
+      list.push(playerId);
+    }
+    renderStartersScreen();
+  }
+
+  document.getElementById("starters-continue-btn").addEventListener("click", function () {
+    var homeIds = startersSelection[pendingMatch.home_team_id] || [];
+    var awayIds = startersSelection[pendingMatch.away_team_id] || [];
+    startersError.classList.add("hidden");
+    // A score-only side has no roster to pick a lineup from, so it's exempt from this check —
+    // see isScoreOnly.
+    var missingRequired = [pendingMatch.home_team_id, pendingMatch.away_team_id].some(function (teamId) {
+      return !isScoreOnly[teamId] && (startersSelection[teamId] || []).length === 0;
+    });
+    if (missingRequired) {
+      startersError.textContent = t("starters.errEmpty");
+      startersError.classList.remove("hidden");
+      return;
+    }
+
+    state = {
+      version: 1,
+      variant: shotPickerVariant(),
+      match: pendingMatch,
+      imported_by: pendingImportedBy,
+      squad: pendingSquad,
+      currentPeriod: 1,
+      nextSequence: 1,
+      activeTeamId: pendingMatch.home_team_id,
+      onCourt: {},
+      events: []
+    };
+    // A roster typed in on this phone has ids the analytics side has never seen, so the match
+    // keeps its own copy to export (see buildExportPayload) — editing the roster afterwards
+    // can't change what this match refers to.
+    if (ROSTER.tagger_made) state.tagger_roster = taggerRosterFor(pendingMatch);
+    state.onCourt[pendingMatch.home_team_id] = homeIds.slice();
+    state.onCourt[pendingMatch.away_team_id] = awayIds.slice();
+    // Logs an 'in' substitution event for every starter right as tagging begins, so the
+    // on-court set at any later point is always fully reconstructable from the event log alone
+    // (see subOut/subIn) — no separate "starting five" concept needs to survive into
+    // match_export.json for plus-minus to work downstream.
+    homeIds.forEach(function (pid) {
+      commitEvent({ team_id: pendingMatch.home_team_id, player_id: pid, event_type: "substitution", sub_type: "in" });
+    });
+    awayIds.forEach(function (pid) {
+      commitEvent({ team_id: pendingMatch.away_team_id, player_id: pid, event_type: "substitution", sub_type: "in" });
+    });
+    pendingMatch = null;
+    pendingImportedBy = null;
+    pendingSquad = null;
+    pauseNudge = null; // an unanswered one from the previous match
+    saveState();
+    enterTaggingScreen();
+  });
+
+  document.getElementById("starters-back-btn").addEventListener("click", function () {
+    showScreen("squad");
+    renderSquadScreen();
+  });
+
+  // ---------- Tagging screen ----------
+  var periodLabel = document.getElementById("period-label");
+  var periodMinusBtn = document.getElementById("period-minus-btn");
+  var teamTabs = document.getElementById("team-tabs");
+  var playerGrid = document.getElementById("player-grid");
+  var scoreOnlyPanel = document.getElementById("score-only-panel");
+  var subsBtn = document.getElementById("subs-btn");
+  var eventLog = document.getElementById("event-log");
+  var scoreHomeName = document.getElementById("score-home-name");
+  var scoreAwayName = document.getElementById("score-away-name");
+  var scoreHomeValue = document.getElementById("score-home-value");
+  var scoreAwayValue = document.getElementById("score-away-value");
+
+  function enterTaggingScreen() {
+    showScreen("tagging");
+    renderTaggingScreen();
+    requestWakeLock();
+  }
+
+  // ---------- Keep screen awake ----------
+  // A phone locking itself during a timeout costs the tagger the next few plays. Best-effort
+  // only: the API is missing on older browsers and may be refused (low battery, file:// on
+  // some browsers) — either way tagging just carries on with normal screen timeout.
+  var wakeLock = null;
+
+  function requestWakeLock() {
+    if (!("wakeLock" in navigator) || wakeLock) return;
+    try {
+      navigator.wakeLock.request("screen").then(function (lock) {
+        wakeLock = lock;
+        lock.addEventListener("release", function () { wakeLock = null; });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function releaseWakeLock() {
+    if (!wakeLock) return;
+    try { wakeLock.release(); } catch (e) {}
+    wakeLock = null;
+  }
+
+  // The browser drops the lock whenever the page is hidden (app switch, screen off), so it has
+  // to be re-requested on the way back.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && state && !taggingScreen.classList.contains("hidden")) {
+      requestWakeLock();
+    }
+  });
+
+  // Regulation is 4 quarters; anything past that is overtime, labeled OT1, OT2, ... rather
+  // than "Period 5", "Period 6" since that's how contributors actually think and talk about it.
+  function periodLabelText(period) {
+    return period <= 4 ? "Q" + period : "OT" + (period - 4);
+  }
+
+  function renderTaggingScreen() {
+    periodLabel.textContent = periodLabelText(state.currentPeriod);
+    periodMinusBtn.disabled = state.currentPeriod <= 1;
+    undoBtn.disabled = !lastUndoableEvent();
+
+    teamTabs.innerHTML = "";
+    [
+      { id: state.match.home_team_id, side: "team-home" },
+      { id: state.match.away_team_id, side: "team-away" }
+    ].forEach(function (entry) {
+      var btn = document.createElement("button");
+      btn.textContent = teamsById[entry.id].name;
+      btn.classList.add(entry.side);
+      if (entry.id === state.activeTeamId) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        state.activeTeamId = entry.id;
+        saveState();
+        renderTaggingScreen();
+      });
+      teamTabs.appendChild(btn);
+    });
+
+    var scoreOnly = isScoreOnly[state.activeTeamId];
+    subsBtn.classList.toggle("hidden", scoreOnly);
+    playerGrid.classList.toggle("hidden", scoreOnly);
+    scoreOnlyPanel.classList.toggle("hidden", !scoreOnly);
+
+    if (scoreOnly) {
+      playerGrid.innerHTML = "";
+    } else {
+      playerGrid.classList.toggle("team-context-home", state.activeTeamId === state.match.home_team_id);
+      playerGrid.classList.toggle("team-context-away", state.activeTeamId === state.match.away_team_id);
+
+      playerGrid.innerHTML = "";
+      onCourtPlayers(state.activeTeamId).forEach(function (p) {
+        var btn = document.createElement("button");
+        btn.className = "player-btn";
+        fillPlayerButton(btn, p);
+        btn.addEventListener("click", function () { openEventTypeModal(p); });
+        playerGrid.appendChild(btn);
+      });
+    }
+
+    updateScoreboard();
+    logBtn.textContent = t("tag.eventLogBtn", { count: state.events.filter(function (ev) {
+      return ev.event_type !== "substitution";
+    }).length });
+    renderPauseNudge();
+    renderEventLog();
+  }
+
+  // The score-only side has exactly one placeholder player (see
+  // analytics-project/roster.py::get_or_create_placeholder) — every tap here commits an
+  // ordinary, schema-legal made shot_attempt/free_throw for that one player, with no zone/
+  // assist prompt (there's no location or teammate to attribute either to).
+  function commitScoreOnlyPoints(points) {
+    var teamId = state.activeTeamId;
+    var playerId = playersForTeam(teamId)[0].id;
+    if (points === 1) {
+      commitEvent({ team_id: teamId, player_id: playerId, event_type: "free_throw", outcome: "made", points: 1 });
+    } else {
+      commitEvent({ team_id: teamId, player_id: playerId, event_type: "shot_attempt", outcome: "made", points: points });
+    }
+  }
+
+  document.getElementById("score-only-2-btn").addEventListener("click", function () { commitScoreOnlyPoints(2); });
+  document.getElementById("score-only-3-btn").addEventListener("click", function () { commitScoreOnlyPoints(3); });
+  document.getElementById("score-only-ft-btn").addEventListener("click", function () { commitScoreOnlyPoints(1); });
+
+  function onCourtPlayers(teamId) {
+    return (state.onCourt[teamId] || []).map(function (id) { return playersById[id]; });
+  }
+
+  document.getElementById("period-plus-btn").addEventListener("click", function () {
+    pauseNudge = null;
+    state.currentPeriod += 1;
+    saveState();
+    renderTaggingScreen();
+  });
+
+  document.getElementById("period-minus-btn").addEventListener("click", function () {
+    pauseNudge = null;
+    if (state.currentPeriod > 1) {
+      state.currentPeriod -= 1;
+      saveState();
+      renderTaggingScreen();
+    }
+  });
+
+  function eventDescription(ev) {
+    if (ev.event_type === "shot_attempt") {
+      var made = ev.outcome === "made";
+      var s = t(made ? "desc.made" : "desc.missed", { points: ev.points });
+      s += shotLocationSummary(ev);
+      if (made && ev.secondary_player_id) {
+        s += t("desc.assist", { name: playerShort(playersById[ev.secondary_player_id]) });
+      }
+      return s;
+    }
+    if (ev.event_type === "free_throw") {
+      return t(ev.outcome === "made" ? "desc.ftMade" : "desc.ftMissed");
+    }
+    if (ev.event_type === "rebound") {
+      return t(ev.rebound_type === "offensive" ? "desc.offReb" : "desc.defReb");
+    }
+    if (ev.event_type === "turnover") return t("desc.turnover");
+    if (ev.event_type === "steal") return t("desc.steal");
+    if (ev.event_type === "foul") {
+      var s = t(ev.foul_type ? "foulLog." + ev.foul_type : "desc.foul");
+      if (ev.secondary_player_id) s += t("desc.drawnBy", { name: playerShort(playersById[ev.secondary_player_id]) });
+      return s;
+    }
+    if (ev.event_type === "block") {
+      var s = t("desc.block");
+      if (ev.secondary_player_id) s += t("desc.shotBy", { name: playerShort(playersById[ev.secondary_player_id]) });
+      return s;
+    }
+    return ev.event_type;
+  }
+
+  // Score is derived from the event log, not tracked separately, so it can never drift out of
+  // sync with it — recomputed here rather than in commitEvent/deleteEvent individually since
+  // renderTaggingScreen() is the one function every path that can change it (add, delete, undo)
+  // already calls.
+  function computeScore(teamId) {
+    return state.events.reduce(function (total, ev) {
+      if (ev.team_id !== teamId) return total;
+      if (ev.event_type === "shot_attempt" && ev.outcome === "made") return total + ev.points;
+      if (ev.event_type === "free_throw" && ev.outcome === "made") return total + 1;
+      return total;
+    }, 0);
+  }
+
+  function updateScoreboard() {
+    scoreHomeName.textContent = teamsById[state.match.home_team_id].name;
+    scoreAwayName.textContent = teamsById[state.match.away_team_id].name;
+    scoreHomeValue.textContent = computeScore(state.match.home_team_id);
+    scoreAwayValue.textContent = computeScore(state.match.away_team_id);
+  }
+
+  function renderEventLog() {
+    eventLog.innerHTML = "";
+    // Substitutions are logged (see subOut/subIn) so plus-minus can be reconstructed later, but
+    // they're bookkeeping, not a "play" — showing all 10 starter check-ins plus every later
+    // swap would bury the actual game events. The Substitutions modal is already the place to
+    // review/undo who's on court; this log stays focused on what happened in the game.
+    var events = state.events
+      .filter(function (ev) { return ev.event_type !== "substitution"; })
+      .sort(function (a, b) { return b.sequence - a.sequence; });
+    if (events.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "empty-log";
+      empty.textContent = t("tag.noEvents");
+      eventLog.appendChild(empty);
+      return;
+    }
+    // Gaps are measured against the previous event of any type, substitutions included: the
+    // first thing tagged after a quarter break is often a sub.
+    var prevAtBySequence = {};
+    state.events.slice().sort(function (a, b) { return a.sequence - b.sequence; })
+      .forEach(function (ev, i, all) { if (i > 0) prevAtBySequence[ev.sequence] = all[i - 1].at; });
+    // A header whenever the period changes, so a forgotten "+" shows up as one long
+    // unbroken block, and a pause marker where the real break probably was.
+    var lastPeriod = null;
+    events.forEach(function (ev) {
+      if (ev.period !== lastPeriod) {
+        var divider = document.createElement("div");
+        divider.className = "log-divider";
+        divider.textContent = periodLabelText(ev.period);
+        eventLog.appendChild(divider);
+        lastPeriod = ev.period;
+      }
+      var row = document.createElement("div");
+      row.className = "log-entry " + (ev.team_id === state.match.home_team_id ? "team-home" : "team-away");
+      var player = playersById[ev.player_id];
+      var team = teamsById[ev.team_id];
+      var info = document.createElement("div");
+      info.innerHTML =
+        '<div class="desc">' + escapeHtml(playerShort(player) + " — " + eventDescription(ev)) + '</div>';
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      meta.appendChild(document.createTextNode(team.name + " · "));
+      // Editable in place, not just deletable — forgetting to advance the period is the most
+      // predictable tagging mistake, and re-tapping after a delete would push the corrected
+      // event to the end of the sequence instead of fixing it where it happened.
+      var periodMinus = document.createElement("button");
+      periodMinus.className = "period-btn";
+      periodMinus.textContent = "‹";
+      periodMinus.title = t("tag.movePrev");
+      periodMinus.disabled = ev.period <= 1;
+      periodMinus.addEventListener("click", function () { editEventPeriod(ev.sequence, -1); });
+      meta.appendChild(periodMinus);
+      var periodText = document.createElement("span");
+      periodText.textContent = " " + periodLabelText(ev.period) + " ";
+      meta.appendChild(periodText);
+      var periodPlus = document.createElement("button");
+      periodPlus.className = "period-btn";
+      periodPlus.textContent = "›";
+      periodPlus.title = t("tag.moveNext");
+      periodPlus.addEventListener("click", function () { editEventPeriod(ev.sequence, 1); });
+      meta.appendChild(periodPlus);
+      info.appendChild(meta);
+      row.appendChild(info);
+      var delBtn = document.createElement("button");
+      delBtn.className = "del-btn";
+      delBtn.textContent = "✕";
+      delBtn.title = t("tag.delete");
+      delBtn.addEventListener("click", function () {
+        askConfirm(t("tag.confirmDelete", { desc: playerShort(player) + " — " + eventDescription(ev) }), function () {
+          deleteEvent(ev.sequence);
+        });
+      });
+      row.appendChild(delBtn);
+      eventLog.appendChild(row);
+      var gap = pauseGapMs(prevAtBySequence[ev.sequence], ev.at);
+      if (gap !== null) {
+        var pause = document.createElement("div");
+        pause.className = "log-pause";
+        pause.textContent = t("tag.pauseMarker", { time: formatDuration(gap) });
+        eventLog.appendChild(pause);
+      }
+    });
+  }
+
+  // ---------- Event log sheet ----------
+  // Behind a button rather than under the player grid: during play the log is only needed to
+  // fix something, and keeping it off the main screen leaves the tagging controls compact.
+  var logModal = document.getElementById("log-modal");
+  var logBtn = document.getElementById("log-btn");
+  logBtn.addEventListener("click", function () {
+    renderEventLog();
+    logModal.classList.remove("hidden");
+  });
+  document.getElementById("log-close-btn").addEventListener("click", function () {
+    logModal.classList.add("hidden");
+  });
+
+  // ---------- Long-pause nudge ----------
+  // Forgetting to press "+" at a quarter break is the most common tagging mistake, and nothing
+  // in the log shows it afterwards. Every event records when it was tapped (`at`, see
+  // commitEvent), so a long silence followed by a tap in the same period is worth one question.
+  // 100 s sits above a timeout (60 s plus the dead time around it) and below a quarter break
+  // (2 min) or halftime.
+  var LONG_PAUSE_MS = 100 * 1000;
+  var pauseNudge = null; // { anchorSeq, fromPeriod, gapMs } — deliberately not saved in state
+  var pauseNudgeEl = document.getElementById("pause-nudge");
+  var pauseNudgeText = document.getElementById("pause-nudge-text");
+  var pauseNudgeYesBtn = document.getElementById("pause-nudge-yes-btn");
+
+  // Matches saved before `at` existed have no timestamps: treat the gap as unknown.
+  function pauseGapMs(prevAt, at) {
+    if (typeof prevAt !== "number" || typeof at !== "number") return null;
+    var gap = at - prevAt;
+    return gap >= LONG_PAUSE_MS ? gap : null;
+  }
+
+  function formatDuration(ms) {
+    var totalSeconds = Math.round(ms / 1000);
+    var seconds = totalSeconds % 60;
+    return Math.floor(totalSeconds / 60) + ":" + (seconds < 10 ? "0" : "") + seconds;
+  }
+
+  function maybeNudgeLongPause(prev, ev) {
+    if (!prev || prev.period !== ev.period) return;
+    var gap = pauseGapMs(prev.at, ev.at);
+    if (gap !== null) pauseNudge = { anchorSeq: ev.sequence, fromPeriod: ev.period, gapMs: gap };
+  }
+
+  function renderPauseNudge() {
+    pauseNudgeEl.classList.toggle("hidden", !pauseNudge);
+    if (!pauseNudge) return;
+    var next = periodLabelText(pauseNudge.fromPeriod + 1);
+    pauseNudgeText.textContent = t("tag.pauseNudge", { time: formatDuration(pauseNudge.gapMs), period: next });
+    pauseNudgeYesBtn.textContent = t("tag.pauseYes", { period: next });
+  }
+
+  // Moves everything tagged since the pause (not just the one tap that triggered the question)
+  // into the next period, since tagging carries on while the banner is up.
+  pauseNudgeYesBtn.addEventListener("click", function () {
+    var nudge = pauseNudge;
+    pauseNudge = null;
+    state.events.forEach(function (ev) {
+      if (ev.sequence >= nudge.anchorSeq && ev.period === nudge.fromPeriod) ev.period = nudge.fromPeriod + 1;
+    });
+    state.currentPeriod = nudge.fromPeriod + 1;
+    saveState();
+    renderTaggingScreen();
+  });
+
+  document.getElementById("pause-nudge-no-btn").addEventListener("click", function () {
+    pauseNudge = null;
+    renderPauseNudge();
+  });
+
+  function deleteEvent(sequence) {
+    state.events = state.events.filter(function (e) { return e.sequence !== sequence; });
+    saveState();
+    renderTaggingScreen();
+  }
+
+  // ---------- Undo last ----------
+  // The most common live correction is "that last tap was wrong" — one button instead of
+  // finding the row in the log. Substitutions are skipped (they're undone from the
+  // Substitutions modal, which also fixes the on-court set). Events committed together by one
+  // tap (a steal and its linked turnover) share a `group` id in state and are undone together;
+  // `group` never reaches the export (buildExportPayload whitelists fields).
+  var undoBtn = document.getElementById("undo-btn");
+
+  function lastUndoableEvent() {
+    return state.events
+      .filter(function (ev) { return ev.event_type !== "substitution"; })
+      .sort(function (a, b) { return b.sequence - a.sequence; })[0] || null;
+  }
+
+  undoBtn.addEventListener("click", function () {
+    var last = lastUndoableEvent();
+    if (!last) return;
+    var toRemove = state.events.filter(function (ev) {
+      return ev.sequence === last.sequence || (last.group !== undefined && ev.group === last.group);
+    });
+    var text = toRemove
+      .sort(function (a, b) { return a.sequence - b.sequence; })
+      .map(function (ev) { return playerShort(playersById[ev.player_id]) + " — " + eventDescription(ev); })
+      .join(" + ");
+    askConfirm(t("tag.confirmUndo", { desc: text }), function () {
+      var seqs = toRemove.map(function (ev) { return ev.sequence; });
+      state.events = state.events.filter(function (ev) { return seqs.indexOf(ev.sequence) === -1; });
+      saveState();
+      renderTaggingScreen();
+    });
+  });
+
+  function editEventPeriod(sequence, delta) {
+    var ev = state.events.filter(function (e) { return e.sequence === sequence; })[0];
+    if (!ev) return;
+    ev.period = Math.max(1, ev.period + delta);
+    saveState();
+    renderEventLog();
+  }
+
+  function commitEvent(partial) {
+    var prev = state.events.reduce(function (latest, e) {
+      return !latest || e.sequence > latest.sequence ? e : latest;
+    }, null);
+    var ev = Object.assign({
+      sequence: state.nextSequence,
+      period: state.currentPeriod,
+      at: Date.now()
+    }, partial);
+    maybeNudgeLongPause(prev, ev);
+    state.nextSequence += 1;
+    state.events.push(ev);
+    saveState();
+    renderTaggingScreen();
+  }
+
+  // ---------- Event type modal ----------
+  var eventTypeModal = document.getElementById("event-type-modal");
+  var eventTypeModalTitle = document.getElementById("event-type-modal-title");
+  var currentPlayer = null;
+
+  function openEventTypeModal(player) {
+    currentPlayer = player;
+    eventTypeModalTitle.textContent = t("event.title", { name: playerFull(player) });
+    eventTypeModal.classList.remove("hidden");
+  }
+  function closeEventTypeModal() {
+    eventTypeModal.classList.add("hidden");
+    currentPlayer = null;
+  }
+  document.getElementById("event-type-cancel-btn").addEventListener("click", closeEventTypeModal);
+
+  eventTypeModal.querySelectorAll("[data-action]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var action = btn.getAttribute("data-action");
+      var player = currentPlayer;
+      closeEventTypeModal();
+      handleEventTypeAction(action, player);
+    });
+  });
+
+  function handleEventTypeAction(action, player) {
+    var base = { team_id: player.team_id, player_id: player.id };
+    switch (action) {
+      case "score":
+        // points isn't known yet — the zone map (or its 2PT/3PT fallback) determines it.
+        openZoneModal(Object.assign({}, base, {
+          event_type: "shot_attempt", outcome: "made"
+        }), true);
+        break;
+      case "miss":
+        openZoneModal(Object.assign({}, base, {
+          event_type: "shot_attempt", outcome: "missed"
+        }), false);
+        break;
+      case "ft_made":
+        commitEvent(Object.assign({}, base, {
+          event_type: "free_throw", outcome: "made", points: 1
+        }));
+        break;
+      case "ft_missed":
+        commitEvent(Object.assign({}, base, {
+          event_type: "free_throw", outcome: "missed"
+        }));
+        break;
+      case "off_reb":
+        commitEvent(Object.assign({}, base, { event_type: "rebound", rebound_type: "offensive" }));
+        break;
+      case "def_reb":
+        commitEvent(Object.assign({}, base, { event_type: "rebound", rebound_type: "defensive" }));
+        break;
+      case "turnover":
+        commitEvent(Object.assign({}, base, { event_type: "turnover" }));
+        break;
+      case "steal":
+        // A score-only opponent has no roster to attribute the linked turnover to (see
+        // isScoreOnly) — skip the link modal entirely and log just the steal, exactly what
+        // its own "Skip" option would do, rather than showing an empty player list.
+        if (isScoreOnly[otherTeamId(player.team_id)]) {
+          commitEvent(Object.assign({}, base, { event_type: "steal" }));
+          break;
+        }
+        openLinkModal(
+          t("link.stealTitle", { team: teamsById[otherTeamId(player.team_id)].name }),
+          t("link.stealSkip"),
+          otherTeamId(player.team_id),
+          function (turnoverPlayerId) {
+            // One tap, two events — grouped so Undo last removes both (see lastUndoableEvent).
+            var group = state.nextSequence;
+            commitEvent(Object.assign({}, base, { event_type: "steal", group: group }));
+            commitEvent({ team_id: otherTeamId(player.team_id), player_id: turnoverPlayerId, event_type: "turnover", group: group });
+          },
+          function () {
+            commitEvent(Object.assign({}, base, { event_type: "steal" }));
+          }
+        );
+        break;
+      case "foul":
+        openFoulModal(player, base);
+        break;
+      case "sub":
+        openSubsModal(player.team_id, player.id, true);
+        break;
+      case "block":
+        if (isScoreOnly[otherTeamId(player.team_id)]) {
+          commitEvent(Object.assign({}, base, { event_type: "block" }));
+          break;
+        }
+        openLinkModal(
+          t("link.blockTitle", { team: teamsById[otherTeamId(player.team_id)].name }),
+          t("link.skip"),
+          otherTeamId(player.team_id),
+          function (shooterId) {
+            commitEvent(Object.assign({}, base, { event_type: "block", secondary_player_id: shooterId }));
+          },
+          function () {
+            commitEvent(Object.assign({}, base, { event_type: "block" }));
+          }
+        );
+        break;
+    }
+  }
+
+  // ---------- Assist modal ----------
+  var assistModal = document.getElementById("assist-modal");
+  var assistList = document.getElementById("assist-list");
+  var pendingShotEvent = null;
+
+  function openAssistModal(shotEvent) {
+    pendingShotEvent = shotEvent;
+    assistList.innerHTML = "";
+    var teammates = onCourtPlayers(shotEvent.team_id).filter(function (p) { return p.id !== shotEvent.player_id; });
+    teammates.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = playerFull(p);
+      btn.addEventListener("click", function () {
+        finishAssist(p.id);
+      });
+      assistList.appendChild(btn);
+    });
+    assistModal.classList.remove("hidden");
+  }
+
+  function finishAssist(secondaryPlayerId) {
+    var ev = pendingShotEvent;
+    if (secondaryPlayerId) ev.secondary_player_id = secondaryPlayerId;
+    pendingShotEvent = null;
+    assistModal.classList.add("hidden");
+    commitEvent(ev);
+  }
+
+  document.getElementById("no-assist-btn").addEventListener("click", function () {
+    finishAssist(null);
+  });
+
+  document.getElementById("assist-cancel-btn").addEventListener("click", function () {
+    // Unlike "No assist" (which still commits the shot), this discards the whole in-progress
+    // shot attempt — for when the location/make-or-miss tap itself was the mistake, not just
+    // the assist attribution.
+    pendingShotEvent = null;
+    assistModal.classList.add("hidden");
+  });
+
+  // ---------- Linked attribution modal (steal->turnover, foul->drawn-by, block->whose-shot) ----------
+  // Shared by three flows that all follow the same shape: tapping a player logs a primary
+  // event for them, and optionally attributes a second role in the same play to a player on
+  // the OTHER team — who lost the ball on a steal, who drew a foul, whose shot got blocked.
+  // "Skip" still logs the primary event with no attribution; "Cancel" logs nothing at all and
+  // returns to the tagging screen, for when the whole tap was a mistake.
+  var linkModal = document.getElementById("link-modal");
+  var linkModalTitle = document.getElementById("link-modal-title");
+  var linkList = document.getElementById("link-list");
+  var linkSkipBtn = document.getElementById("link-skip-btn");
+  var pendingLinkOnSkip = null;
+
+  function otherTeamId(teamId) {
+    return teamId === state.match.home_team_id ? state.match.away_team_id : state.match.home_team_id;
+  }
+
+  function openLinkModal(title, skipLabel, teamId, onPick, onSkip) {
+    foulTypeRow.classList.add("hidden");
+    linkList.classList.remove("hidden");
+    linkModalTitle.textContent = title;
+    linkSkipBtn.textContent = skipLabel;
+    linkList.innerHTML = "";
+    onCourtPlayers(teamId).forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = playerFull(p);
+      btn.addEventListener("click", function () {
+        closeLinkModal();
+        onPick(p.id);
+      });
+      linkList.appendChild(btn);
+    });
+    pendingLinkOnSkip = onSkip;
+    linkModal.classList.remove("hidden");
+  }
+
+  function closeLinkModal() {
+    linkModal.classList.add("hidden");
+    pendingLinkOnSkip = null;
+  }
+
+  linkSkipBtn.addEventListener("click", function () {
+    var onSkip = pendingLinkOnSkip;
+    closeLinkModal();
+    if (onSkip) onSkip();
+  });
+
+  document.getElementById("link-cancel-btn").addEventListener("click", function () {
+    closeLinkModal();
+  });
+
+  // ---------- Foul: type + who drew it ----------
+  // The link modal with a row of foul types on top. Personal is preselected, so the common
+  // foul costs no extra tap; the type is exported as foul_type. A technical has nobody who
+  // "drew" it, so the player list is hidden for it and Skip becomes the only way to log.
+  // An offensive foul is also a turnover by the same player (standard box-score convention),
+  // logged as a second, linked event — grouped like a steal's turnover, so Undo removes both.
+  // Labels are "foul.<id>" (the button) and "foulLog.<id>" (the event log) in i18n.js.
+  var FOUL_TYPES = ["personal", "shooting", "offensive", "technical", "unsportsmanlike", "disqualifying"];
+  var foulTypeRow = document.getElementById("foul-type-row");
+
+  function openFoulModal(player, base) {
+    var foulType = "personal";
+    var opponentId = otherTeamId(player.team_id);
+    // A score-only opponent has no roster to name who drew it (see isScoreOnly).
+    var canLink = !isScoreOnly[opponentId];
+    function commitFoul(drawnByPlayerId) {
+      var ev = Object.assign({}, base, { event_type: "foul", foul_type: foulType });
+      if (drawnByPlayerId) ev.secondary_player_id = drawnByPlayerId;
+      if (foulType !== "offensive") {
+        commitEvent(ev);
+        return;
+      }
+      var group = state.nextSequence;
+      commitEvent(Object.assign(ev, { group: group }));
+      commitEvent(Object.assign({}, base, { event_type: "turnover", group: group }));
+    }
+    // Title and Skip label depend on the chosen type — render() below sets them.
+    openLinkModal(
+      "",
+      "",
+      canLink ? opponentId : null,
+      commitFoul,
+      function () { commitFoul(null); }
+    );
+    function render() {
+      var linkable = canLink && foulType !== "technical";
+      foulTypeRow.innerHTML = "";
+      FOUL_TYPES.forEach(function (id) {
+        var btn = document.createElement("button");
+        btn.textContent = t("foul." + id);
+        if (id === foulType) btn.classList.add("selected");
+        btn.addEventListener("click", function () { foulType = id; render(); });
+        foulTypeRow.appendChild(btn);
+      });
+      linkList.classList.toggle("hidden", !linkable);
+      linkModalTitle.textContent = linkable
+        ? t("link.foulTitle", { team: teamsById[opponentId].name })
+        : t("foul.titleNoLink", { type: t("foulLog." + foulType), name: playerShort(player) });
+      linkSkipBtn.textContent = linkable ? t("link.skip") : t("foul.log", { type: t("foulLog." + foulType).toLowerCase() });
+    }
+    render();
+    foulTypeRow.classList.remove("hidden");
+  }
+
+  // ---------- Substitutions modal ----------
+  // A swap is two taps: who comes off, then who goes on — logged as an out followed by an in.
+  // Both tracked teams are reachable from tabs inside the modal, so a dead ball with subs on
+  // both sides is one visit. Opened from a player's own event picker ("⇄ Sub") that player is
+  // already selected and the modal closes after the swap: tap player, Sub, pick the replacement.
+  var subsModal = document.getElementById("subs-modal");
+  var subsTeamTabs = document.getElementById("subs-team-tabs");
+  var subsOnCourtTitle = document.getElementById("subs-oncourt-title");
+  var subsOnCourtList = document.getElementById("subs-oncourt-list");
+  var subsBenchList = document.getElementById("subs-bench-list");
+  var subsOutOnlyBtn = document.getElementById("subs-out-only-btn");
+  var subsExtraToggle = document.getElementById("subs-extra-toggle");
+  var subsExtraList = document.getElementById("subs-extra-list");
+  var subsExtraOpen = false;
+  var subsTeamId = null;
+  var subsSelectedOut = null;
+  var subsCloseAfterSwap = false;
+
+  function openSubsModal(teamId, selectedOutId, closeAfterSwap) {
+    subsTeamId = teamId;
+    subsSelectedOut = selectedOutId;
+    subsCloseAfterSwap = closeAfterSwap;
+    subsExtraOpen = false;
+    renderSubsModal();
+    subsModal.classList.remove("hidden");
+  }
+
+  function closeSubsModal() {
+    subsModal.classList.add("hidden");
+    renderTaggingScreen();
+  }
+
+  document.getElementById("subs-btn").addEventListener("click", function () {
+    openSubsModal(state.activeTeamId, null, false);
+  });
+
+  // Today's squad for a team (see the "Who's playing today" screen), or null for a match
+  // started before squads existed — the bench is then the whole roster, as it always was.
+  function squadIds(teamId) {
+    return state.squad && state.squad[teamId] ? state.squad[teamId] : null;
+  }
+
+  subsExtraToggle.addEventListener("click", function () {
+    subsExtraOpen = !subsExtraOpen;
+    renderSubsModal();
+  });
+
+  // Adding someone to the squad mid-match (a late arrival, or left out by mistake) puts them
+  // on the bench, ready to sub in, and into the exported squad.
+  function addToSquad(teamId, playerId) {
+    if (state.squad[teamId].indexOf(playerId) === -1) state.squad[teamId].push(playerId);
+    subsExtraOpen = false;
+    saveState();
+    renderSubsModal();
+  }
+
+  var subsBenchTitle = document.getElementById("subs-bench-title");
+
+  // Jersey number first — it's what the tagger reads off the court — and no "#null" for a
+  // player the roster has no number for.
+  function subsLabel(p) {
+    return [jerseyText(p), p.name].filter(Boolean).join(" ");
+  }
+
+  // Sorted by jersey number (unnumbered last, then by name), so a long bench can be scanned
+  // for a number instead of read top to bottom.
+  function byJersey(a, b) {
+    var ja = a.jersey_number === null || a.jersey_number === undefined ? Infinity : a.jersey_number;
+    var jb = b.jersey_number === null || b.jersey_number === undefined ? Infinity : b.jersey_number;
+    return ja !== jb ? ja - jb : String(a.name).localeCompare(String(b.name));
+  }
+
+  function renderSubsTeamTabs() {
+    subsTeamTabs.innerHTML = "";
+    var tracked = trackedTeamIds(state.match);
+    subsTeamTabs.classList.toggle("hidden", tracked.length < 2);
+    tracked.forEach(function (teamId) {
+      var btn = document.createElement("button");
+      btn.textContent = teamsById[teamId].name;
+      btn.classList.add(teamId === state.match.home_team_id ? "team-home" : "team-away");
+      if (teamId === subsTeamId) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        if (teamId === subsTeamId) return;
+        subsTeamId = teamId;
+        subsSelectedOut = null;
+        subsExtraOpen = false;
+        renderSubsModal();
+      });
+      subsTeamTabs.appendChild(btn);
+    });
+  }
+
+  function renderSubsModal() {
+    var teamId = subsTeamId;
+    var onCourtIds = state.onCourt[teamId] || [];
+    if (subsSelectedOut && onCourtIds.indexOf(subsSelectedOut) === -1) subsSelectedOut = null;
+    var squad = squadIds(teamId);
+    var bench = playersForTeam(teamId)
+      .filter(function (p) { return onCourtIds.indexOf(p.id) === -1 && (!squad || squad.indexOf(p.id) !== -1); })
+      .sort(byJersey);
+    var courtFull = onCourtIds.length >= 5;
+    // A bench tap swaps with the selected player, or — with a free spot on court and nobody
+    // selected — just sends the player on.
+    var benchTappable = !!subsSelectedOut || !courtFull;
+    var sideClass = teamId === state.match.home_team_id ? "team-context-home" : "team-context-away";
+
+    renderSubsTeamTabs();
+    subsOnCourtTitle.textContent = t(subsSelectedOut ? "subs.onCourtDeselect" : "subs.onCourtPick");
+    subsBenchTitle.textContent = subsSelectedOut
+      ? t("subs.benchReplace", { name: playerShort(playersById[subsSelectedOut]) })
+      : t(courtFull ? "subs.benchPickFirst" : "subs.benchSendOn");
+
+    subsOnCourtList.innerHTML = "";
+    subsOnCourtList.classList.remove("team-context-home", "team-context-away");
+    subsOnCourtList.classList.add(sideClass);
+    if (onCourtIds.length === 0) {
+      var emptyOnCourt = document.createElement("div");
+      emptyOnCourt.className = "empty-log";
+      emptyOnCourt.textContent = t("subs.noneOnCourt");
+      subsOnCourtList.appendChild(emptyOnCourt);
+    }
+    onCourtPlayers(teamId).slice().sort(byJersey).forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = subsLabel(p);
+      if (p.id === subsSelectedOut) btn.classList.add("selected");
+      btn.addEventListener("click", function () {
+        subsSelectedOut = subsSelectedOut === p.id ? null : p.id;
+        renderSubsModal();
+      });
+      subsOnCourtList.appendChild(btn);
+    });
+
+    subsBenchList.innerHTML = "";
+    if (bench.length === 0) {
+      var emptyBench = document.createElement("div");
+      emptyBench.className = "empty-log";
+      emptyBench.textContent = t(squadIds(teamId) ? "subs.squadAllOn" : "subs.rosterAllOn");
+      subsBenchList.appendChild(emptyBench);
+    }
+    bench.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = subsLabel(p);
+      btn.disabled = !benchTappable;
+      btn.addEventListener("click", function () {
+        if (subsSelectedOut) swap(teamId, subsSelectedOut, p.id);
+        else subIn(teamId, p.id);
+      });
+      subsBenchList.appendChild(btn);
+    });
+
+    subsOutOnlyBtn.classList.toggle("hidden", !subsSelectedOut);
+    if (subsSelectedOut) {
+      subsOutOnlyBtn.textContent = t("subs.outOnly", { name: playerShort(playersById[subsSelectedOut]) });
+    }
+
+    var notInSquad = squad
+      ? playersForTeam(teamId).filter(function (p) { return squad.indexOf(p.id) === -1; }).sort(byJersey)
+      : [];
+    subsExtraToggle.classList.toggle("hidden", notInSquad.length === 0);
+    subsExtraToggle.textContent = t(subsExtraOpen ? "subs.hideExtra" : "subs.addExtra");
+    subsExtraList.classList.toggle("hidden", !subsExtraOpen || notInSquad.length === 0);
+    subsExtraList.innerHTML = "";
+    notInSquad.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = "+ " + subsLabel(p);
+      btn.addEventListener("click", function () { addToSquad(teamId, p.id); });
+      subsExtraList.appendChild(btn);
+    });
+  }
+
+  subsOutOnlyBtn.addEventListener("click", function () {
+    if (!subsSelectedOut) return;
+    var playerId = subsSelectedOut;
+    subsSelectedOut = null;
+    subOut(subsTeamId, playerId);
+  });
+
+  // Logged as 'substitution' events (sub_type 'in'/'out'), not just a change to local
+  // state.onCourt — this is what lets the analytics side reconstruct who was on court at any
+  // point in the match (for plus-minus) purely from the exported event log, with no separate
+  // "lineup" concept needed. commitEvent() already calls saveState() after appending the event,
+  // so the onCourt mutation above it rides along in that same save rather than needing its own.
+  function subOut(teamId, playerId) {
+    state.onCourt[teamId] = (state.onCourt[teamId] || []).filter(function (id) { return id !== playerId; });
+    commitEvent({ team_id: teamId, player_id: playerId, event_type: "substitution", sub_type: "out" });
+    renderSubsModal();
+  }
+
+  function subIn(teamId, playerId) {
+    var list = state.onCourt[teamId] || (state.onCourt[teamId] = []);
+    if (list.length >= 5 || list.indexOf(playerId) !== -1) return;
+    list.push(playerId);
+    commitEvent({ team_id: teamId, player_id: playerId, event_type: "substitution", sub_type: "in" });
+    renderSubsModal();
+  }
+
+  // The replacement takes the same spot in the on-court order, so the main player grid
+  // doesn't reshuffle under the tagger's thumb after every sub.
+  function swap(teamId, outId, inId) {
+    var slot = (state.onCourt[teamId] || []).indexOf(outId);
+    subsSelectedOut = null;
+    subOut(teamId, outId);
+    subIn(teamId, inId);
+    var list = state.onCourt[teamId];
+    if (slot !== -1 && list[list.length - 1] === inId) {
+      list.splice(list.length - 1, 1);
+      list.splice(slot, 0, inId);
+      saveState();
+    }
+    if (subsCloseAfterSwap) closeSubsModal();
+    else renderSubsModal();
+  }
+
+  document.getElementById("subs-done-btn").addEventListener("click", closeSubsModal);
+
+  // ---------- Finish & export ----------
+  var confirmModal = document.getElementById("confirm-modal");
+  var confirmModalText = document.getElementById("confirm-modal-text");
+  var confirmYesBtn = document.getElementById("confirm-yes-btn");
+  var confirmNoBtn = document.getElementById("confirm-no-btn");
+
+  function askConfirm(text, onYes, onNo) {
+    confirmModalText.textContent = text;
+    confirmModal.classList.remove("hidden");
+    function cleanup() {
+      confirmModal.classList.add("hidden");
+      confirmYesBtn.removeEventListener("click", yesHandler);
+      confirmNoBtn.removeEventListener("click", noHandler);
+    }
+    function yesHandler() { cleanup(); onYes(); }
+    function noHandler() { cleanup(); if (onNo) onNo(); }
+    confirmYesBtn.addEventListener("click", yesHandler);
+    confirmNoBtn.addEventListener("click", noHandler);
+  }
+
+  document.getElementById("finish-btn").addEventListener("click", function () {
+    askConfirm(t("finish.confirm"), function () {
+      openExportModal();
+    });
+  });
+
+  // Whitelists fields, so state-only bookkeeping (`group`, the `at` tap time) never reaches the
+  // export.
+  function buildExportPayload() {
+    var events = state.events.slice().sort(function (a, b) { return a.sequence - b.sequence; })
+      .map(function (ev) {
+        var out = {
+          sequence: ev.sequence,
+          period: ev.period,
+          team_id: ev.team_id,
+          player_id: ev.player_id,
+          event_type: ev.event_type
+        };
+        if (ev.event_type === "shot_attempt") {
+          out.outcome = ev.outcome;
+          out.points = ev.points;
+          if (ev.outcome === "made" && ev.secondary_player_id) {
+            out.secondary_player_id = ev.secondary_player_id;
+          }
+          applyExportShotLocation(ev, out);
+        } else if (ev.event_type === "free_throw") {
+          out.outcome = ev.outcome;
+          if (ev.outcome === "made") out.points = ev.points;
+        } else if (ev.event_type === "rebound") {
+          out.rebound_type = ev.rebound_type;
+        } else if (ev.event_type === "foul" || ev.event_type === "block") {
+          if (ev.secondary_player_id) out.secondary_player_id = ev.secondary_player_id;
+          // Fouls logged before foul types existed have none — exported without, as before.
+          if (ev.event_type === "foul" && ev.foul_type) out.foul_type = ev.foul_type;
+        } else if (ev.event_type === "substitution") {
+          out.sub_type = ev.sub_type;
+        }
+        return out;
+      });
+
+    var payload = {
+      match: state.match,
+      imported_by: state.imported_by,
+      exported_at: new Date().toISOString(),
+      events: events
+    };
+    if (state.tagger_roster) payload.tagger_roster = state.tagger_roster;
+    // Matchday squads, so the analytics side can record DNPs — only for tracked teams, and not
+    // at all for a match started before squads existed (the importer treats it as optional).
+    if (state.squad) {
+      payload.squads = Object.keys(state.squad).map(function (teamId) {
+        return { team_id: teamId, player_ids: state.squad[teamId].slice() };
+      });
+    }
+    return payload;
+  }
+
+  // ---------- Export modal ----------
+  // Explicit Download/Share controls, rather than an auto-triggered export: on several
+  // browsers (notably desktop Chrome and locked-down mobile contexts) navigator.share()
+  // can silently reject even when canShare() returned true, and older iOS Safari doesn't
+  // reliably honor the <a download> attribute either. A visible, always-present link the
+  // user taps themselves is the only thing that's reliably retryable when that happens.
+  //
+  // navigator.share() is only even attempted when the page is served over http(s). This
+  // file is always opened directly (file://, or a content:// URI from a chat app's file
+  // viewer) — Chromium's Web Share implementation unconditionally rejects with
+  // NotAllowedError for those origins, on desktop AND Android, no matter what canShare()
+  // claims beforehand or how well the rejection is caught. Offering a button that can
+  // never work is worse than not offering it, so it's simply not shown in that case.
+  var isWebOrigin = location.protocol === "http:" || location.protocol === "https:";
+
+  var exportModal = document.getElementById("export-modal");
+  var exportModalDesc = document.getElementById("export-modal-desc");
+  var exportDownloadLink = document.getElementById("export-download-link");
+  var exportShareBtn = document.getElementById("export-share-btn");
+  var exportShareStatus = document.getElementById("export-share-status");
+  var exportDoneBtn = document.getElementById("export-done-btn");
+  var exportKeepBtn = document.getElementById("export-keep-btn");
+  var currentExportUrl = null;
+  var currentExportBlob = null;
+  var currentExportFilename = null;
+  var currentShareFilename = null;
+
+  function setShareStatus(text) {
+    if (!text) {
+      exportShareStatus.classList.add("hidden");
+      exportShareStatus.textContent = "";
+      return;
+    }
+    exportShareStatus.textContent = text;
+    exportShareStatus.classList.remove("hidden");
+  }
+
+  function openExportModal() {
+    var payload = buildExportPayload();
+    currentExportFilename = "match_export_" + state.match.played_on + "_" + Date.now() + ".json";
+    // Shared files go out as .txt (same JSON content — the Import page accepts both): Chrome on
+    // Android only lets a web page share files whose *extension* is on its own allowlist, and
+    // .json isn't on it. share() then rejects with NotAllowedError, even though canShare()
+    // said yes beforehand, since canShare() doesn't check the extension.
+    currentShareFilename = currentExportFilename.replace(/\.json$/, ".txt");
+    var json = JSON.stringify(payload, null, 2);
+    currentExportBlob = new Blob([json], { type: "application/json" });
+    currentExportUrl = URL.createObjectURL(currentExportBlob);
+
+    exportDownloadLink.href = currentExportUrl;
+    exportDownloadLink.download = currentExportFilename;
+    setShareStatus(null);
+
+    var canShareFiles = false;
+    if (isWebOrigin && navigator.canShare && navigator.share) {
+      try {
+        // iOS Safari's canShare()/share() reject files whose MIME type isn't on its
+        // internal allowlist — "application/json" is not on it, so probing with the
+        // real content type makes canShare() return false and the button never appears,
+        // even though sharing a JSON file works fine once it's tagged as "text/plain".
+        var probeFile = new File([currentExportBlob], currentShareFilename, { type: "text/plain" });
+        canShareFiles = navigator.canShare({ files: [probeFile] });
+      } catch (e) { canShareFiles = false; }
+    }
+    exportShareBtn.classList.toggle("hidden", !canShareFiles);
+    exportModalDesc.textContent = canShareFiles
+      ? t("export.descShare")
+      : t("export.descDownload");
+
+    exportModal.classList.remove("hidden");
+  }
+
+  function closeExportModal() {
+    exportModal.classList.add("hidden");
+    if (currentExportUrl) {
+      URL.revokeObjectURL(currentExportUrl);
+      currentExportUrl = null;
+    }
+  }
+
+  exportShareBtn.addEventListener("click", function () {
+    // Feedback here must not rely on alert(): some in-app browsers (chat apps'
+    // built-in viewers, etc.) silently no-op window.alert(), which would make a
+    // real failure look identical to nothing happening at all. Writing directly
+    // into the page is the only reliably visible channel in those contexts.
+    // Set immediately (before the async call) so a tap always visibly registers,
+    // even if the OS share sheet takes a moment (or never) to appear.
+    setShareStatus(t("export.opening"));
+    try {
+      var file = new File([currentExportBlob], currentShareFilename, { type: "text/plain" });
+      navigator.share({ files: [file], title: currentShareFilename })
+        .then(function () { setShareStatus(null); })
+        .catch(function (err) {
+          // Do not special-case AbortError as "user cancelled, stay quiet": on Android,
+          // share() can reject with AbortError even when no share sheet ever appeared
+          // (i.e. it also covers "the share failed"), not only an intentional dismissal.
+          // Silently swallowing it here previously looked exactly like a dead button.
+          var reason = err && err.name ? err.name : "unknown error";
+          setShareStatus(t("export.shareFailed", { reason: reason }));
+        });
+    } catch (e) {
+      setShareStatus(t("export.shareUnavailable"));
+    }
+  });
+
+  exportDoneBtn.addEventListener("click", function () {
+    closeExportModal();
+    clearState();
+    releaseWakeLock();
+    recoveringForeignMatch = false;
+    showScreen("setup");
+    resetSetupSelection();
+    taggerNameInput.value = "";
+    competitionSelect.value = "";
+    renderSetupScreen();
+  });
+
+  exportKeepBtn.addEventListener("click", function () {
+    closeExportModal();
+    if (recoveringForeignMatch) recoveryModal.classList.remove("hidden");
+  });
+
+  // ---------- Recovery: saved match from a different tagger file ----------
+  // See isStateCompatible. The foreign match is still perfectly exportable — buildExportPayload
+  // and openExportModal only read ids and raw event fields, never names — so it goes through
+  // the normal export modal (whose "clear this match" then frees this file for a new match)
+  // rather than being silently lost or crashing the page.
+  var recoveryModal = document.getElementById("recovery-modal");
+  var recoverySwitchLink = document.getElementById("recovery-switch-link");
+  var recoveringForeignMatch = false;
+
+  function openRecoveryModal() {
+    recoveringForeignMatch = true;
+    // Hosted build: if the only problem is that the match was started on the other variant's
+    // page (same site, same roster), the fix is simply to go back there.
+    var otherVariant = state.variant && VARIANT_INFO[state.variant];
+    var onlyVariantDiffers = IS_HOSTED && otherVariant &&
+      isStateCompatible(Object.assign({}, state, { variant: undefined }));
+    recoverySwitchLink.classList.toggle("hidden", !onlyVariantDiffers);
+    if (onlyVariantDiffers) {
+      recoverySwitchLink.href = otherVariant.url;
+      recoverySwitchLink.textContent = t("recovery.continue", { variant: t(otherVariant.labelKey) });
+    }
+    showScreen("setup");
+    renderSetupScreen();
+    recoveryModal.classList.remove("hidden");
+  }
+
+  document.getElementById("recovery-export-btn").addEventListener("click", function () {
+    recoveryModal.classList.add("hidden");
+    openExportModal();
+  });
+
+  document.getElementById("recovery-discard-btn").addEventListener("click", function () {
+    recoveryModal.classList.add("hidden");
+    askConfirm(t("recovery.confirmDiscard"), function () {
+      clearState();
+      recoveringForeignMatch = false;
+      renderSetupScreen();
+    }, function () {
+      recoveryModal.classList.remove("hidden");
+    });
+  });
+
+  // ---------- Stats overlay (client-side box score, print-to-PDF) ----------
+  // Same formulas analytics-project/analytics.py's _PRIMARY_STATS_CTE/_ASSIST_STATS_CTE use to
+  // compute a match box score from the event table, transliterated to run over the in-memory
+  // event log instead of SQL — so a coach can see (and print) a box score the moment tagging
+  // ends, without importing into the analytics app first. A score-only team (see isScoreOnly)
+  // needs no special-casing here: since no rebound/foul/assist/etc. events are ever committed
+  // for it, its one placeholder player's row naturally comes out with only points/fga/fgm/fta/
+  // ftm populated, matching what the backend would compute from the same events post-import.
+  // Column headers are "stats.<key>" in i18n.js.
+  // Counting columns are summed for the totals row; a column with pct() is a ratio, computed
+  // from the row's own counts (so the totals row gets the team's real percentage, not a sum),
+  // with the same formulas as the analytics project (3_Stats.py: TS% = PTS / 2(FGA + 0.44 FTA),
+  // eFG% = (FGM + 0.5 3PM) / FGA). "—" when there's no attempt to divide by.
+  var BOX_SCORE_COLUMNS = [
+    { key: "points" },
+    { key: "fgm" },
+    { key: "fga" },
+    { key: "fg_pct", pct: function (r) { return [r.fgm, r.fga]; } },
+    { key: "fg3m" },
+    { key: "fg3a" },
+    { key: "fg3_pct", pct: function (r) { return [r.fg3m, r.fg3a]; } },
+    { key: "ftm" },
+    { key: "fta" },
+    { key: "ft_pct", pct: function (r) { return [r.ftm, r.fta]; } },
+    { key: "reb_off" },
+    { key: "reb_def" },
+    { key: "assists" },
+    { key: "steals" },
+    { key: "turnovers" },
+    { key: "fouls" },
+    { key: "blocks" },
+    { key: "efg_pct", pct: function (r) { return [r.fgm + 0.5 * r.fg3m, r.fga]; } },
+    { key: "ts_pct", pct: function (r) { return [r.points, 2 * (r.fga + 0.44 * r.fta)]; } }
+  ];
+
+  function boxScoreCell(col, row) {
+    if (!col.pct) return String(row[col.key]);
+    var nd = col.pct(row);
+    return nd[1] > 0 ? Math.round(100 * nd[0] / nd[1]) + "%" : "—";
+  }
+
+  function computePlayerStats(playerId) {
+    var s = {
+      points: 0, fga: 0, fgm: 0, fg3a: 0, fg3m: 0, fta: 0, ftm: 0,
+      reb_off: 0, reb_def: 0, assists: 0, steals: 0, turnovers: 0, fouls: 0, blocks: 0
+    };
+    state.events.forEach(function (ev) {
+      if (ev.player_id === playerId) {
+        if (ev.event_type === "shot_attempt") {
+          s.fga++;
+          if (ev.points === 3) s.fg3a++;
+          if (ev.outcome === "made") {
+            s.fgm++;
+            s.points += ev.points;
+            if (ev.points === 3) s.fg3m++;
+          }
+        } else if (ev.event_type === "free_throw") {
+          s.fta++;
+          if (ev.outcome === "made") {
+            s.ftm++;
+            s.points += 1;
+          }
+        } else if (ev.event_type === "rebound") {
+          s[ev.rebound_type === "offensive" ? "reb_off" : "reb_def"]++;
+        } else if (ev.event_type === "steal") {
+          s.steals++;
+        } else if (ev.event_type === "turnover") {
+          s.turnovers++;
+        } else if (ev.event_type === "foul") {
+          s.fouls++;
+        } else if (ev.event_type === "block") {
+          s.blocks++;
+        }
+      }
+      if (ev.event_type === "shot_attempt" && ev.outcome === "made" && ev.secondary_player_id === playerId) {
+        s.assists++;
+      }
+    });
+    return s;
+  }
+
+  // Row set matches match_box_score's SQL exactly: only players who actually appear in an
+  // event or as an assist for this team, not the whole roster (someone who never left the
+  // bench shouldn't get a zeroed-out row), plus a summed "TEAM TOTALS" row.
+  function computeTeamBoxScore(teamId) {
+    var ids = {};
+    state.events.forEach(function (ev) {
+      if (ev.team_id !== teamId) return;
+      ids[ev.player_id] = true;
+      if (ev.event_type === "shot_attempt" && ev.outcome === "made" && ev.secondary_player_id) {
+        ids[ev.secondary_player_id] = true;
+      }
+    });
+    var rows = Object.keys(ids).map(function (pid) {
+      var stats = computePlayerStats(pid);
+      stats.player_id = pid;
+      stats.name = subsLabel(playersById[pid]);
+      return stats;
+    }).sort(function (a, b) { return b.points - a.points; });
+
+    var totals = { name: t("stats.totals") };
+    BOX_SCORE_COLUMNS.forEach(function (col) {
+      if (col.pct) return;
+      totals[col.key] = rows.reduce(function (sum, r) { return sum + r[col.key]; }, 0);
+    });
+    return { rows: rows, totals: totals };
+  }
+
+  function buildBoxScoreTable(teamName, boxScore) {
+    var table = document.createElement("table");
+    table.className = "stats-table";
+    var caption = document.createElement("caption");
+    caption.textContent = teamName;
+    table.appendChild(caption);
+
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    var nameTh = document.createElement("th");
+    nameTh.textContent = t("stats.player");
+    headRow.appendChild(nameTh);
+    BOX_SCORE_COLUMNS.forEach(function (col) {
+      var th = document.createElement("th");
+      th.textContent = t("stats." + col.key);
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = document.createElement("tbody");
+    function addRow(rowData, isTotals) {
+      var tr = document.createElement("tr");
+      if (isTotals) tr.className = "totals-row";
+      var nameTd = document.createElement("td");
+      nameTd.textContent = rowData.name;
+      tr.appendChild(nameTd);
+      BOX_SCORE_COLUMNS.forEach(function (col) {
+        var td = document.createElement("td");
+        td.textContent = boxScoreCell(col, rowData);
+        if (col.pct) td.className = "pct";
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    boxScore.rows.forEach(function (r) { addRow(r, false); });
+    addRow(boxScore.totals, true);
+    table.appendChild(tbody);
+    return table;
+  }
+
+  var statsOverlay = document.getElementById("stats-overlay");
+  var statsContent = document.getElementById("stats-content");
+
+  function renderStatsOverlay() {
+    statsContent.innerHTML = "";
+
+    var scoreLine = document.createElement("div");
+    scoreLine.className = "stats-score-line";
+    scoreLine.textContent =
+      teamsById[state.match.home_team_id].name + "  " + computeScore(state.match.home_team_id) +
+      " – " + computeScore(state.match.away_team_id) + "  " + teamsById[state.match.away_team_id].name;
+    statsContent.appendChild(scoreLine);
+
+    // 20 columns don't fit a phone: each table scrolls sideways on its own (the print
+    // stylesheet lets it lay out in full on the landscape page).
+    [state.match.home_team_id, state.match.away_team_id].forEach(function (teamId) {
+      var scroller = document.createElement("div");
+      scroller.className = "stats-scroll";
+      scroller.appendChild(buildBoxScoreTable(teamsById[teamId].name, computeTeamBoxScore(teamId)));
+      statsContent.appendChild(scroller);
+    });
+  }
+
+  document.getElementById("stats-btn").addEventListener("click", function () {
+    renderStatsOverlay();
+    statsOverlay.classList.remove("hidden");
+  });
+  document.getElementById("stats-close-btn").addEventListener("click", function () {
+    statsOverlay.classList.add("hidden");
+  });
+  document.getElementById("stats-print-btn").addEventListener("click", function () {
+    window.print();
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ---------- Boot ----------
+  state = loadState();
+  if (state && !isStateCompatible(state)) {
+    openRecoveryModal();
+  } else if (state) {
+    // A match started before the starting-lineups feature existed has no onCourt field yet —
+    // fall back to the first 5 rostered players per team rather than crashing on resume.
+    if (!state.onCourt) {
+      state.onCourt = {};
+      [state.match.home_team_id, state.match.away_team_id].forEach(function (teamId) {
+        state.onCourt[teamId] = playersForTeam(teamId).slice(0, 5).map(function (p) { return p.id; });
+      });
+      saveState();
+    }
+    enterTaggingScreen();
+  } else {
+    renderSetupScreen();
+    showScreen("setup");
+  }
+
+  // Hosted build only: cache the page for offline use after the first visit (see build.py's
+  // site/ output). A tagger opened as a local file has nothing to register, and secure-context
+  // rules would refuse it anyway.
+  if (IS_HOSTED && "serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  }
+
+  function shotPickerVariant() { return "freeform"; }
+
+  function applyExportShotLocation(ev, out) {
+    if (ev.shot_x !== undefined && ev.shot_y !== undefined) {
+      out.shot_x = ev.shot_x;
+      out.shot_y = ev.shot_y;
+    }
+  }
+
+  // ---------- Freeform location modal ----------
+  // Runs between the event-type tap and the assist prompt (for makes) / straight commit
+  // (for misses). Tapping the court places a marker and computes 2PT/3PT live from the tapped
+  // point; unlike the zone-map variant's oversized regions, a freeform tap has no built-in
+  // undo, so an explicit Confirm/Retry step exists before the location is recorded. The two
+  // fallback buttons still exist for when the tagger doesn't want to pinpoint a spot — points
+  // must always be recorded even then.
+  var zoneModal = document.getElementById("zone-modal");
+  var zoneModalTitle = document.getElementById("zone-modal-title");
+  var courtMapEl = document.getElementById("court-map");
+  var courtReadout = document.getElementById("court-readout");
+  var courtConfirmRow = document.getElementById("court-confirm-row");
+  var pendingZoneEvent = null;
+  var pendingZoneIsMade = false;
+  var pendingLocation = null;
+
+  // SVG's y-axis increases downward, but "logical" court y (matching analytics-project/ui.py
+  // and shot_y in the export) increases away from the baseline. Everything drawn or tapped is
+  // done in logical coordinates; a single flipped <g> (baseline at the bottom of the diagram,
+  // like a real court) handles the visual conversion in one place.
+  var courtGroupEl = null;
+
+  function svgPointFromEvent(svg, evt) {
+    var pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    var svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return [svgP.x, COURT_TOP - svgP.y];
+  }
+
+  function renderCourtMap() {
+    courtMapEl.innerHTML = "";
+    courtGroupEl = svgEl("g", { transform: "translate(0," + COURT_TOP + ") scale(1,-1)" });
+    courtMapEl.appendChild(courtGroupEl);
+    var bg = svgEl("rect", { "class": "court-bg", x: 0, y: 0, width: 50, height: COURT_TOP });
+    bg.addEventListener("click", function (evt) {
+      var p = svgPointFromEvent(courtMapEl, evt);
+      placeMarker(p[0], p[1]);
+    });
+    courtGroupEl.appendChild(bg);
+    renderCourtLines(courtGroupEl);
+  }
+
+  function placeMarker(x, y) {
+    x = Math.max(0, Math.min(50, x));
+    y = Math.max(0, Math.min(COURT_TOP, y));
+    pendingLocation = [x, y];
+    var existing = courtGroupEl.querySelector(".court-marker");
+    if (existing) existing.remove();
+    courtGroupEl.appendChild(svgEl("circle", { "class": "court-marker", cx: x.toFixed(2), cy: y.toFixed(2), r: 1.1 }));
+    courtReadout.textContent = t("shot.marked", { points: isThreePointer(x, y) ? 3 : 2 });
+    courtConfirmRow.classList.remove("hidden");
+  }
+
+  function clearMarker() {
+    pendingLocation = null;
+    var existing = courtMapEl.querySelector(".court-marker");
+    if (existing) existing.remove();
+    courtReadout.textContent = t("shot.tapCourt");
+    courtConfirmRow.classList.add("hidden");
+  }
+
+  function openZoneModal(shotEvent, isMade) {
+    pendingZoneEvent = shotEvent;
+    pendingZoneIsMade = isMade;
+    zoneModalTitle.textContent = t("shot.where", { kind: t(isMade ? "event.score" : "event.miss") });
+    renderCourtMap();
+    clearMarker();
+    zoneModal.classList.remove("hidden");
+  }
+
+  function finishZoneFallback(points) {
+    var ev = pendingZoneEvent;
+    ev.points = points;
+    proceedAfterZone(ev);
+  }
+
+  function proceedAfterZone(ev) {
+    var isMade = pendingZoneIsMade;
+    pendingZoneEvent = null;
+    pendingLocation = null;
+    zoneModal.classList.add("hidden");
+    if (isMade) {
+      openAssistModal(ev);
+    } else {
+      commitEvent(ev);
+    }
+  }
+
+  document.getElementById("court-confirm-btn").addEventListener("click", function () {
+    if (!pendingLocation) return;
+    var ev = pendingZoneEvent;
+    ev.shot_x = Number(pendingLocation[0].toFixed(2));
+    ev.shot_y = Number(pendingLocation[1].toFixed(2));
+    ev.points = isThreePointer(pendingLocation[0], pendingLocation[1]) ? 3 : 2;
+    proceedAfterZone(ev);
+  });
+
+  document.getElementById("court-retry-btn").addEventListener("click", function () {
+    clearMarker();
+  });
+
+  document.getElementById("zone-fallback-2-btn").addEventListener("click", function () {
+    finishZoneFallback(2);
+  });
+  document.getElementById("zone-fallback-3-btn").addEventListener("click", function () {
+    finishZoneFallback(3);
+  });
+  document.getElementById("zone-cancel-btn").addEventListener("click", function () {
+    pendingZoneEvent = null;
+    zoneModal.classList.add("hidden");
+  });
+})();
+</script>
+</body>
+</html>
